@@ -1,0 +1,61 @@
+@import "leaflet/dist/leaflet.css";
+@import "leaflet-defaulticon-compatibility/dist/leaflet-defaulticon-compatibility.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #DDE7E1;
+    --foreground: #3E6B5A;
+    --border: rgba(62, 107, 90, 0.28);
+    --input: rgba(62, 107, 90, 0.28);
+    --ring: #5F8F7B;
+    
+    --primary: #5F8F7B;
+    --primary-foreground: #F6FAF8;
+    
+    --secondary: #EAF3EE;
+    --secondary-foreground: #3E6B5A;
+    
+    --muted: #EAF3EE;
+    --muted-foreground: #5F8F7B;
+    
+    --accent: #EAF3EE;
+    --accent-foreground: #3E6B5A;
+    
+    --card: #F6FAF8;
+    --card-foreground: #3E6B5A;
+    
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased min-h-screen;
+    background-image:
+      linear-gradient(rgba(62, 107, 90, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(62, 107, 90, 0.055) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  ::selection {
+    background-color: rgba(95, 143, 123, 0.22);
+    color: var(--primary);
+  }
+}
+
+.retro-edge {
+  border: 2px solid var(--foreground);
+  box-shadow: 6px 6px 0 rgba(62, 107, 90, 0.22);
+}
+
+.leaflet-container {
+  font-family: inherit;
+  z-index: 10;
+  border-radius: var(--radius);
+}

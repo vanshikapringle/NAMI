@@ -142,18 +142,46 @@ const landingQuotes = [
 ];
 
 function getDisplayName(session: any) {
-  const rawName =
-    session?.user?.user_metadata?.full_name ||
-    session?.user?.user_metadata?.name ||
-    session?.user?.email?.split("@")[0] ||
-    "Vanshika";
+  const metadata = session?.user?.user_metadata || {};
+  
+  // 1. Explicit first name
+  if (metadata.first_name) {
+    return metadata.first_name.trim();
+  }
+  
+  // 2. Full name or Name (extract first part)
+  const fullName = metadata.full_name || metadata.name;
+  if (fullName) {
+    const firstPart = fullName.trim().split(/\s+/)[0];
+    if (firstPart) {
+      return firstPart.charAt(0).toUpperCase() + firstPart.slice(1);
+    }
+  }
 
-  const compactName = rawName.replace(/[._-]/g, " ").trim();
-  if (compactName.toLowerCase().includes("vanshika")) return "Vanshika";
-
-  const firstName = compactName.split(" ")[0] || "Vanshika";
-  return firstName.charAt(0).toUpperCase() + firstName.slice(1);
+  // 3. Username or User Name (extract first part if it has separators)
+  const username = metadata.username || metadata.user_name;
+  if (username) {
+    const cleanUsername = username.replace(/[._-]/g, " ").trim();
+    const firstPart = cleanUsername.split(/\s+/)[0];
+    if (firstPart) {
+      return firstPart.charAt(0).toUpperCase() + firstPart.slice(1);
+    }
+  }
+  
+  // 4. Email prefix (extract first part)
+  const email = session?.user?.email;
+  if (email) {
+    const emailPrefix = email.split("@")[0];
+    const cleanEmail = emailPrefix.replace(/[._-]/g, " ").trim();
+    const firstPart = cleanEmail.split(/\s+/)[0];
+    if (firstPart) {
+      return firstPart.charAt(0).toUpperCase() + firstPart.slice(1);
+    }
+  }
+  
+  return "Vanshika";
 }
+
 
 function getTimePeriod() {
   const hour = new Date().getHours();
@@ -201,6 +229,7 @@ export default function Home() {
   const [showAuth, setShowAuth] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [activeTab, setActiveTab] = useState("journal");
+  const [selectedJournalLocation, setSelectedJournalLocation] = useState("All");
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [timeTick, setTimeTick] = useState(() => Date.now());
@@ -395,24 +424,24 @@ export default function Home() {
       </div>
 
       <main className="flex-1 pb-24 lg:pb-0">
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-white/80 px-6 py-4 backdrop-blur-md lg:px-10">
-          <div className="flex min-w-0 items-center gap-4">
-            <LogoMark className="hidden h-16 w-16 flex-none sm:block lg:hidden" />
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-white/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur-md lg:px-10">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <LogoMark className="hidden h-12 w-12 sm:h-16 sm:w-16 flex-none sm:block lg:hidden" />
             <div className="min-w-0">
-              <p className="mb-1 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                <Sparkles className="h-3.5 w-3.5" />
+              <p className="mb-0.5 sm:mb-1 flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                <Sparkles className="h-3 sm:h-3.5 w-3 sm:w-3.5" />
                 {activeTab === "map" ? "Journey Map" : activeTab}
               </p>
-              <h2 className="truncate text-2xl font-bold tracking-tight text-foreground">
+              <h2 className="truncate text-lg sm:text-2xl font-bold tracking-tight text-foreground">
                 {dashboardGreeting}
               </h2>
-              <p className="mt-1 max-w-xl truncate text-sm text-muted-foreground">
+              <p className="mt-0.5 hidden sm:block max-w-xl truncate text-xs sm:text-sm text-muted-foreground">
                 {dailyQuote}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               onClick={() => {
                 setShowDashboard(false);
@@ -425,11 +454,11 @@ export default function Home() {
             </button>
             <button
               onClick={() => setIsUploadModalOpen(true)}
-              className="group flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md active:scale-95"
+              className="group flex items-center gap-1.5 rounded-full bg-primary px-3 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md active:scale-95"
             >
-              <Upload className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" />
-              <span className="hidden sm:inline">Upload Memory</span>
-              <span className="sm:hidden">Upload</span>
+              <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4 transition-transform group-hover:-translate-y-0.5" />
+              <span className="hidden xs:inline">Upload Memory</span>
+              <span className="xs:hidden">Upload</span>
             </button>
           </div>
         </header>
@@ -447,11 +476,39 @@ export default function Home() {
                 <JournalView
                   memories={memories}
                   onMemoryUpdated={handleMemoryUpdated}
+                  selectedLocation={selectedJournalLocation}
+                  onLocationChange={setSelectedJournalLocation}
                 />
               )}
-              {activeTab === "map" && <MapView memories={memories} />}
+              {activeTab === "map" && (
+                <MapView
+                  memories={memories}
+                  onLocationSelect={(locationName) => {
+                    setSelectedJournalLocation(locationName);
+                    updateActiveTab("journal");
+                  }}
+                />
+              )}
               {activeTab === "analytics" && <AnalyticsView memories={memories} />}
-              {activeTab === "profile" && <ProfileView session={session} memories={memories} />}
+              {activeTab === "profile" && (
+                <ProfileView
+                  session={session}
+                  memories={memories}
+                  onProfileUpdated={(metadata) => {
+                    setSession((currentSession: any) =>
+                      currentSession
+                        ? {
+                            ...currentSession,
+                            user: {
+                              ...currentSession.user,
+                              user_metadata: metadata,
+                            },
+                          }
+                        : currentSession
+                    );
+                  }}
+                />
+              )}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -475,7 +532,7 @@ function SplashScreen() {
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#DDE7E1] px-6">
       <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }}
+        initial={false}
         animate={{ opacity: 1, scale: 1 }}
         className="retro-edge relative z-10 flex w-full max-w-md flex-col items-center rounded-md bg-[#F6FAF8] p-8 text-center text-[#3E6B5A]"
       >
@@ -909,9 +966,13 @@ function LandingNote({
 function JournalView({
   memories,
   onMemoryUpdated,
+  selectedLocation,
+  onLocationChange,
 }: {
   memories: Memory[];
   onMemoryUpdated: (memory: Memory) => void;
+  selectedLocation: string;
+  onLocationChange: (location: string) => void;
 }) {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [lightboxMemory, setLightboxMemory] = useState<Memory | null>(null);
@@ -939,124 +1000,194 @@ function JournalView({
       : memories.filter(
           (memory) => (memory.category || "Uncategorized") === selectedCategory
         );
+  const locations = [
+    "All",
+    ...Array.from(
+      new Set(visibleMemories.map((memory) => memory.location_name || "Unknown Location"))
+    ).sort(),
+  ];
+  const locationMemories =
+    selectedLocation === "All"
+      ? visibleMemories
+      : visibleMemories.filter(
+          (memory) =>
+            (memory.location_name || "Unknown Location") === selectedLocation
+        );
+  const groupedMemories = Array.from(
+    locationMemories.reduce<Map<string, Memory[]>>((groups, memory) => {
+      const locationName = memory.location_name || "Unknown Location";
+      const current = groups.get(locationName) || [];
+      current.push(memory);
+      groups.set(locationName, current);
+      return groups;
+    }, new Map())
+  ).sort(([a], [b]) => a.localeCompare(b));
 
   return (
     <>
-      <div className="mb-6 rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
-          <Filter className="h-4 w-4" />
-          Filter by tag
+      <div className="mb-6 grid gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div>
+          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
+            <Filter className="h-4 w-4" />
+            Filter by tag
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {categories.map((category) => (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={cn(
+                  "rounded-full border px-4 py-2 text-sm font-semibold transition-colors",
+                  selectedCategory === category
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {categories.map((category) => (
-            <button
-              key={category}
-              onClick={() => setSelectedCategory(category)}
-              className={cn(
-                "rounded-full border px-4 py-2 text-sm font-semibold transition-colors",
-                selectedCategory === category
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground"
-              )}
-            >
-              {category}
-            </button>
-          ))}
+        <div>
+          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
+            <MapPin className="h-4 w-4" />
+            Location groups
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {locations.map((location) => (
+              <button
+                key={location}
+                onClick={() => onLocationChange(location)}
+                className={cn(
+                  "rounded-full border px-4 py-2 text-sm font-semibold transition-colors",
+                  selectedLocation === location
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                {location}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {!visibleMemories.length ? (
+      {!locationMemories.length ? (
         <EmptyState
-          icon={<Filter className="h-8 w-8 text-primary" />}
-          title="No memories in this tag"
-          description="Try another tag to bring your memories back into view."
+          icon={<MapPin className="h-8 w-8 text-primary" />}
+          title="No memories in this view"
+          description="Try another tag or location to bring your memories back into view."
         />
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {visibleMemories.map((mem) => (
-            <motion.article
-              key={mem.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              whileHover={{ y: -4 }}
-              className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:shadow-md"
+        <div className="grid gap-8">
+          {groupedMemories.map(([locationName, locationEntries]) => (
+            <section
+              key={locationName}
+              className="rounded-2xl border border-border bg-white/55 p-4 shadow-sm"
             >
-              {mem.image_url ? (
-                <button
-                  type="button"
-                  onClick={() => setLightboxMemory(mem)}
-                  className="relative aspect-[4/3] w-full overflow-hidden bg-secondary text-left"
-                  aria-label={`Open ${mem.title} image`}
-                >
-                  <Image
-                    src={mem.image_url}
-                    alt={mem.title}
-                    fill
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  {mem.category && (
-                    <div className="absolute left-3 top-3 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold tracking-wide text-white backdrop-blur-md">
-                      {mem.category}
-                    </div>
-                  )}
-                  <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-black/55 px-3 py-1 text-xs font-bold text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100">
-                    <Maximize2 className="h-3.5 w-3.5" />
-                    View
-                  </div>
-                </button>
-              ) : (
-                <div className="flex aspect-[4/3] w-full items-center justify-center bg-secondary">
-                  <Camera className="h-10 w-10 text-muted-foreground/30" />
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5" />
+                    Location
+                  </p>
+                  <h3 className="mt-1 text-2xl font-black text-foreground">
+                    {locationName}
+                  </h3>
                 </div>
-              )}
-
-              <div className="flex flex-1 flex-col p-5">
-                <div className="mb-3 flex items-center justify-between text-xs font-medium text-muted-foreground">
-                  <div className="flex items-center gap-1.5 bg-secondary px-2 py-1 rounded-md">
-                    <Calendar className="h-3 w-3" />
-                    {mem.visit_date}
-                  </div>
-                  <div className="flex items-center gap-1.5 truncate max-w-[140px]">
-                    <MapPin className="h-3 w-3" />
-                    <span className="truncate">{mem.location_name || "Unknown"}</span>
-                  </div>
-                </div>
-
-                <h3 className="mb-2 text-xl font-bold tracking-tight text-foreground line-clamp-1">
-                  {mem.title}
-                </h3>
-                
-                <p className="mb-4 text-sm leading-relaxed text-muted-foreground line-clamp-2">
-                  {mem.description || "No journal entry added."}
+                <p className="text-sm font-semibold text-muted-foreground">
+                  {locationEntries.length} {locationEntries.length === 1 ? "entry" : "entries"}
                 </p>
-
-                <div className="mt-auto flex items-center justify-between gap-4 border-t border-border pt-4 text-sm">
-                  <div className="flex min-w-0 items-center gap-4">
-                    {mem.rating && (
-                      <div className="flex items-center gap-1 font-semibold text-yellow-500">
-                        <Star className="h-4 w-4 fill-current" />
-                        {mem.rating}/5
-                      </div>
-                    )}
-                    {mem.time_spent && (
-                      <div className="flex items-center gap-1.5 truncate font-medium text-muted-foreground">
-                        <Clock className="h-4 w-4 flex-none" />
-                        <span className="truncate">{mem.time_spent}</span>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setEditingMemory(mem)}
-                    className="flex flex-none items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-bold text-foreground transition-colors hover:bg-secondary"
-                  >
-                    <Edit3 className="h-3.5 w-3.5" />
-                    Edit
-                  </button>
-                </div>
               </div>
-            </motion.article>
+
+              <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                {locationEntries.map((mem) => (
+                  <motion.article
+                    key={mem.id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    whileHover={{ y: -4 }}
+                    className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:shadow-md"
+                  >
+                    {mem.image_url ? (
+                      <button
+                        type="button"
+                        onClick={() => setLightboxMemory(mem)}
+                        className="relative aspect-[4/3] w-full overflow-hidden bg-secondary text-left"
+                        aria-label={`Open ${mem.title} image`}
+                      >
+                        <Image
+                          src={mem.image_url}
+                          alt={mem.title}
+                          fill
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        {mem.category && (
+                          <div className="absolute left-3 top-3 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold tracking-wide text-white backdrop-blur-md">
+                            {mem.category}
+                          </div>
+                        )}
+                        <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-black/55 px-3 py-1 text-xs font-bold text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100">
+                          <Maximize2 className="h-3.5 w-3.5" />
+                          View
+                        </div>
+                      </button>
+                    ) : (
+                      <div className="flex aspect-[4/3] w-full items-center justify-center bg-secondary">
+                        <Camera className="h-10 w-10 text-muted-foreground/30" />
+                      </div>
+                    )}
+
+                    <div className="flex flex-1 flex-col p-5">
+                      <div className="mb-3 flex items-center justify-between text-xs font-medium text-muted-foreground">
+                        <div className="flex items-center gap-1.5 bg-secondary px-2 py-1 rounded-md">
+                          <Calendar className="h-3 w-3" />
+                          {mem.visit_date}
+                        </div>
+                        <div className="flex items-center gap-1.5 truncate max-w-[140px]">
+                          <MapPin className="h-3 w-3" />
+                          <span className="truncate">{mem.location_name || "Unknown"}</span>
+                        </div>
+                      </div>
+
+                      <h3 className="mb-2 text-xl font-bold tracking-tight text-foreground line-clamp-1">
+                        {mem.title}
+                      </h3>
+                      
+                      <p className="mb-4 text-sm leading-relaxed text-muted-foreground line-clamp-2">
+                        {mem.description || "No journal entry added."}
+                      </p>
+
+                      <div className="mt-auto flex items-center justify-between gap-4 border-t border-border pt-4 text-sm">
+                        <div className="flex min-w-0 items-center gap-4">
+                          {mem.rating && (
+                            <div className="flex items-center gap-1 font-semibold text-yellow-500">
+                              <Star className="h-4 w-4 fill-current" />
+                              {mem.rating}/5
+                            </div>
+                          )}
+                          {mem.time_spent && (
+                            <div className="flex items-center gap-1.5 truncate font-medium text-muted-foreground">
+                              <Clock className="h-4 w-4 flex-none" />
+                              <span className="truncate">{mem.time_spent}</span>
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingMemory(mem)}
+                          className="flex flex-none items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-bold text-foreground transition-colors hover:bg-secondary"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                          Edit
+                        </button>
+                      </div>
+                    </div>
+                  </motion.article>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}
@@ -1076,7 +1207,6 @@ function JournalView({
     </>
   );
 }
-
 function ImageLightbox({
   memory,
   onClose,
@@ -1346,7 +1476,13 @@ function EditField({
   );
 }
 
-function MapView({ memories }: { memories: Memory[] }) {
+function MapView({
+  memories,
+  onLocationSelect,
+}: {
+  memories: Memory[];
+  onLocationSelect: (locationName: string) => void;
+}) {
   const validMemories = memories.filter((m) => m.lat != null && m.lng != null);
 
   if (!validMemories.length) {
@@ -1368,8 +1504,11 @@ function MapView({ memories }: { memories: Memory[] }) {
         </p>
       </div>
 
-      <div className="min-h-[600px] w-full bg-secondary relative z-0">
-        <MapViewComponent memories={validMemories} />
+      <div className="h-[350px] sm:h-[500px] lg:h-[600px] w-full bg-secondary relative z-0">
+        <MapViewComponent
+          memories={validMemories}
+          onLocationSelect={onLocationSelect}
+        />
       </div>
     </div>
   );
@@ -1560,10 +1699,64 @@ function ChartPanel({
 function ProfileView({
   session,
   memories,
+  onProfileUpdated,
 }: {
   session: any;
   memories: Memory[];
+  onProfileUpdated: (metadata: Record<string, any>) => void;
 }) {
+  const metadata = session.user.user_metadata || {};
+  const [firstName, setFirstName] = useState(metadata.first_name || "");
+  const [lastName, setLastName] = useState(metadata.last_name || "");
+  const [gender, setGender] = useState(metadata.gender || "");
+  const [aboutMe, setAboutMe] = useState(metadata.about_me !== undefined ? metadata.about_me : "I am an aspiring AI and Data Science professional with a strong foundation in Python, machine learning, and artificial intelligence. I enjoy building AI-based solutions, full-stack web applications, and data-driven platforms through research and projects.");
+  const [hobbies, setHobbies] = useState(
+    metadata.hobbies !== undefined 
+      ? (Array.isArray(metadata.hobbies) ? metadata.hobbies.join(", ") : metadata.hobbies) 
+      : "AI, Data Science, Python, Travelling, Reading, Journalling"
+  );
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  useEffect(() => {
+    setFirstName(metadata.first_name || "");
+    setLastName(metadata.last_name || "");
+    setGender(metadata.gender || "");
+    setAboutMe(metadata.about_me !== undefined ? metadata.about_me : "I am an aspiring AI and Data Science professional with a strong foundation in Python, machine learning, and artificial intelligence. I enjoy building AI-based solutions, full-stack web applications, and data-driven platforms through research and projects.");
+    setHobbies(
+      metadata.hobbies !== undefined 
+        ? (Array.isArray(metadata.hobbies) ? metadata.hobbies.join(", ") : metadata.hobbies) 
+        : "AI, Data Science, Python, Travelling, Reading, Journalling"
+    );
+  }, [metadata.first_name, metadata.last_name, metadata.gender, metadata.about_me, metadata.hobbies]);
+
+  const handleSaveProfile = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSavingProfile(true);
+
+    const nextMetadata = {
+      ...metadata,
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
+      gender,
+      about_me: aboutMe.trim(),
+      hobbies: hobbies.split(",").map(item => item.trim()).filter(Boolean),
+    };
+
+    const { error } = await supabase.auth.updateUser({
+      data: nextMetadata,
+    });
+
+    setSavingProfile(false);
+
+    if (error) {
+      alert(error.message || "Could not update your profile.");
+      return;
+    }
+
+    onProfileUpdated(nextMetadata);
+  };
+
   return (
     <div className="grid max-w-4xl gap-6 lg:grid-cols-[0.9fr_1.1fr]">
       <section className="rounded-2xl border border-border bg-card p-8 shadow-sm">
@@ -1583,6 +1776,73 @@ function ProfileView({
             <p className="mt-1 text-2xl font-bold">{memories.length}</p>
           </div>
         </div>
+
+        <form onSubmit={handleSaveProfile} className="mt-8 border-t border-border pt-6">
+          <p className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+            Edit Profile
+          </p>
+          <div className="grid gap-4">
+            <EditField label="First Name">
+              <input
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+                placeholder="Vanshika"
+                required
+              />
+            </EditField>
+            <EditField label="Last Name">
+              <input
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+                placeholder="Pringle"
+              />
+            </EditField>
+            <EditField label="Gender">
+              <select
+                value={gender}
+                onChange={(event) => setGender(event.target.value)}
+              >
+                <option value="">Prefer not to say</option>
+                <option value="female">Female</option>
+                <option value="male">Male</option>
+                <option value="non-binary">Non-binary</option>
+                <option value="other">Other</option>
+              </select>
+            </EditField>
+            <EditField label="About Me">
+              <textarea
+                value={aboutMe}
+                onChange={(event) => setAboutMe(event.target.value)}
+                placeholder="Tell us about yourself..."
+                rows={4}
+              />
+            </EditField>
+            <EditField label="Interests / Hobbies (comma-separated)">
+              <input
+                value={hobbies}
+                onChange={(event) => setHobbies(event.target.value)}
+                placeholder="AI, Data Science, Travelling"
+              />
+            </EditField>
+          </div>
+          <button
+            type="submit"
+            disabled={savingProfile}
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 disabled:opacity-50"
+          >
+            {savingProfile ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Saving
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                Save Profile
+              </>
+            )}
+          </button>
+        </form>
       </section>
 
       <section className="rounded-2xl border border-border bg-card p-8 shadow-sm">
@@ -1590,13 +1850,13 @@ function ProfileView({
           About Me
         </p>
         <h3 className="mt-3 text-2xl font-black text-foreground">
-          Vanshika Pringle
+          {firstName || lastName ? `${firstName} ${lastName}`.trim() : "Traveler"}
         </h3>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          I am an aspiring AI and Data Science professional with a strong foundation in Python, machine learning, and artificial intelligence. I enjoy building AI-based solutions, full-stack web applications, and data-driven platforms through research and projects.
+        <p className="mt-3 text-sm leading-6 text-muted-foreground whitespace-pre-line">
+          {aboutMe || "No about details provided yet."}
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
-          {["AI", "Data Science", "Python", "Travelling", "Reading", "Journalling"].map((item) => (
+          {hobbies.split(",").map(item => item.trim()).filter(Boolean).map((item) => (
             <span
               key={item}
               className="rounded-full border border-border bg-secondary px-3 py-1.5 text-xs font-bold text-foreground"
@@ -1633,6 +1893,9 @@ function EmptyState({
 function AuthUI({ onBack }: { onBack?: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [gender, setGender] = useState("");
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -1642,9 +1905,21 @@ function AuthUI({ onBack }: { onBack?: () => void }) {
     setLoading(true);
     setError("");
 
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
     const { error } = isLogin
       ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({ email, password });
+      : await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              first_name: firstName.trim(),
+              last_name: lastName.trim(),
+              full_name: fullName,
+              gender,
+            },
+          },
+        });
 
     if (error) setError(error.message);
     setLoading(false);
@@ -1706,6 +1981,48 @@ function AuthUI({ onBack }: { onBack?: () => void }) {
         </div>
 
         <form onSubmit={handleAuth} className="space-y-4">
+          {!isLogin && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-foreground">First Name</label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  className="w-full rounded-xl border border-border bg-transparent px-4 py-2.5 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary"
+                  placeholder="Vanshika"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-foreground">Last Name</label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-transparent px-4 py-2.5 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary"
+                  placeholder="Pringle"
+                />
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-sm font-semibold text-foreground">Gender</label>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-transparent px-4 py-2.5 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">Prefer not to say</option>
+                  <option value="female">Female</option>
+                  <option value="male">Male</option>
+                  <option value="non-binary">Non-binary</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-foreground">Email</label>
             <input

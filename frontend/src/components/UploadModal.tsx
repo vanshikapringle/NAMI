@@ -27,6 +27,7 @@ export default function UploadModal({
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Uncategorized");
   const [description, setDescription] = useState("");
+  const [locationName, setLocationName] = useState("");
   const [visitDate, setVisitDate] = useState("");
   const [notes, setNotes] = useState("");
   const [timeSpent, setTimeSpent] = useState("");
@@ -39,6 +40,7 @@ export default function UploadModal({
     setTitle("");
     setCategory("Uncategorized");
     setDescription("");
+    setLocationName("");
     setVisitDate("");
     setNotes("");
     setTimeSpent("");
@@ -107,7 +109,7 @@ export default function UploadModal({
         lng: apiData.lng,
         image_url: publicUrl,
         category,
-        location_name: apiData.location_name || "Unknown Location",
+        location_name: locationName || apiData.location_name || "Unknown Location",
         visit_date: visitDate || new Date().toISOString().split("T")[0],
         notes,
         time_spent: timeSpent,
@@ -236,6 +238,17 @@ export default function UploadModal({
                       type="date"
                       value={visitDate}
                       onChange={(e) => setVisitDate(e.target.value)}
+                      className="form-input"
+                      disabled={loading}
+                    />
+                  </Field>
+
+                  <Field label="Location Name">
+                    <input
+                      type="text"
+                      value={locationName}
+                      onChange={(e) => setLocationName(e.target.value)}
+                      placeholder="e.g. Manali, Himachal Pradesh"
                       className="form-input"
                       disabled={loading}
                     />

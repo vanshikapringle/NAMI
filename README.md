@@ -1,4 +1,4 @@
-# nami.
+# NAMI
 
 <div align="center">
   <img src="./frontend/public/logo.png" alt="Nami Logo" width="120" />
@@ -27,7 +27,7 @@
 
 ## 📖 Overview
 
-**nami.** (Trails & Tales) is a personal travel journal and memory archive designed to help you preserve, visualize, and reflect on your travel experiences. By letting you upload photos and combining them with location-aware data, Nami automatically extracts coordinates via EXIF metadata to map your trails on an interactive dashboard. Built with a beautiful, minimal retro aesthetic, Nami turns scattered travel moments into a structured digital atlas.
+**NAMI** (Trails & Tales) is a personal travel journal and memory archive designed to help you preserve, visualize, and reflect on your travel experiences. By letting you upload photos and combining them with location-aware data, Nami automatically extracts coordinates via EXIF metadata to map your trails on an interactive dashboard. Built with a beautiful, minimal retro aesthetic, Nami turns scattered travel moments into a structured digital atlas.
 
 ## ✨ Features
 

@@ -153,7 +153,7 @@ export default function DynamicMap({
             <Polyline
               key={index}
               positions={trip}
-              color="#5F8F7B"
+              color="#34D399"
               weight={4}
               dashArray="8,8"
             />

@@ -346,12 +346,12 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="sticky top-0 hidden h-screen w-72 flex-col border-r border-border bg-white px-6 py-8 lg:flex">
+      <aside className="sticky top-0 hidden h-screen w-72 flex-col bg-[var(--sidebar-bg)] px-6 py-8 lg:flex">
         <div className="mb-10 flex items-center gap-3">
-          <LogoMark className="h-16 w-16" />
+          <LogoMark className="h-24 w-24" />
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-foreground">Trails & Tales</h1>
-            <p className="text-xs font-medium text-muted-foreground">Memory archive</p>
+            <h1 className="text-xl font-bold tracking-tight text-[var(--text-on-dark)]">Trails & Tales</h1>
+            <p className="text-xs font-medium text-[var(--text-on-dark)]/70">Memory archive</p>
           </div>
         </div>
 
@@ -361,7 +361,7 @@ export default function Home() {
               setShowDashboard(false);
               setShowAuth(false);
             }}
-            className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground"
+            className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-[var(--text-on-dark)]/70 transition-all duration-200 hover:bg-white/10 hover:text-[var(--text-on-dark)]"
           >
             <HomeIcon className="h-5 w-5" />
             Home
@@ -373,8 +373,8 @@ export default function Home() {
               className={cn(
                 "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200",
                 activeTab === tab.id
-                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  ? "bg-[var(--accent)] text-white shadow-md shadow-accent/20"
+                  : "text-[var(--text-on-dark)]/70 hover:bg-white/10 hover:text-[var(--text-on-dark)]"
               )}
             >
               <tab.icon className="h-5 w-5" />
@@ -383,10 +383,10 @@ export default function Home() {
           ))}
         </nav>
 
-        <div className="mt-auto border-t border-border pt-6">
+        <div className="mt-auto border-t border-white/10 pt-6">
           <button
             onClick={() => supabase.auth.signOut()}
-            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-red-50 hover:text-red-600"
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-[var(--text-on-dark)]/70 transition-all duration-200 hover:bg-red-900/30 hover:text-red-400"
           >
             <LogOut className="h-5 w-5" />
             Sign Out
@@ -395,13 +395,13 @@ export default function Home() {
       </aside>
 
       {/* Mobile nav placeholder */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-border bg-white/80 p-4 backdrop-blur-lg lg:hidden">
+      <div className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-[var(--sidebar-bg)]/95 p-4 backdrop-blur-lg lg:hidden">
         <button
           onClick={() => {
             setShowDashboard(false);
             setShowAuth(false);
           }}
-          className="flex flex-col items-center gap-1 rounded-lg p-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="flex flex-col items-center gap-1 rounded-lg p-2 text-xs font-medium text-[var(--text-on-dark)]/70 transition-colors hover:text-[var(--text-on-dark)]"
         >
           <HomeIcon className="h-6 w-6" />
           <span>Home</span>
@@ -413,8 +413,8 @@ export default function Home() {
             className={cn(
               "flex flex-col items-center gap-1 rounded-lg p-2 text-xs font-medium transition-colors",
               activeTab === tab.id
-                ? "text-primary"
-                : "text-muted-foreground hover:text-foreground"
+                ? "text-[var(--accent)]"
+                : "text-[var(--text-on-dark)]/70 hover:text-[var(--text-on-dark)]"
             )}
           >
             <tab.icon className="h-6 w-6" />
@@ -426,7 +426,7 @@ export default function Home() {
       <main className="flex-1 pb-24 lg:pb-0">
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-white/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur-md lg:px-10">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <LogoMark className="hidden h-12 w-12 sm:h-16 sm:w-16 flex-none sm:block lg:hidden" />
+            <LogoMark className="hidden h-16 w-16 sm:h-24 sm:w-24 flex-none sm:block lg:hidden" />
             <div className="min-w-0">
               <p className="mb-0.5 sm:mb-1 flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
                 <Sparkles className="h-3 sm:h-3.5 w-3 sm:w-3.5" />
@@ -527,41 +527,56 @@ export default function Home() {
 }
 
 function SplashScreen() {
-  const quote = getDashboardQuote();
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 24) {
+          clearInterval(interval);
+          return 24;
+        }
+        return prev + 1;
+      });
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#DDE7E1] px-6">
-      <motion.div 
-        initial={false}
-        animate={{ opacity: 1, scale: 1 }}
-        className="retro-edge relative z-10 flex w-full max-w-md flex-col items-center rounded-md bg-[#F6FAF8] p-8 text-center text-[#3E6B5A]"
-      >
-        <LogoMark className="mb-7 h-32 w-32" />
-        <p className="mb-2 font-mono text-xs font-bold uppercase tracking-[0.2em] text-[#5F8F7B]">
-          Preparing your memory deck
-        </p>
-        <h1 className="text-4xl font-black tracking-tight">
-          Trails & Tales
-        </h1>
-        <p className="mt-4 text-sm font-medium leading-6 text-[#5F8F7B]">
-          {quote}
-        </p>
-        
-        <div className="mt-8 w-full max-w-xs border-2 border-[#3E6B5A] bg-[#DDE7E1] p-1 shadow-[5px_5px_0_rgba(62,107,90,0.18)]">
-          <div className="relative h-5 overflow-hidden bg-[#EAF3EE]">
-            <motion.div
-              className="absolute inset-y-0 left-0 w-1/2 bg-[#3E6B5A]"
-              animate={{ x: ["-100%", "220%"] }}
-              transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-            />
-            <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent_0,transparent_8px,rgba(246,250,248,0.28)_8px,rgba(246,250,248,0.28)_14px)]" />
-          </div>
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[var(--bg-main)] px-6 font-mono">
+      <div className="relative z-10 flex w-full max-w-xl flex-col gap-6 text-[var(--text-primary)]">
+        {/* BIOS Header */}
+        <div className="flex flex-col gap-1 text-[10px] sm:text-xs leading-relaxed text-[var(--text-primary)] opacity-90 select-none">
+          <p>TT_OS v2.5.0</p>
+          <p>BIOS DATE: 05/28/26 14:02:11 VER 2.5</p>
+          <p>CPU: UNKNOWN EMOTIONAL PROCESSOR</p>
+          <p>MEMORY: DEGRADED BUT FUNCTIONING</p>
+          <p className="mt-2 text-[var(--text-primary)] font-bold">{`> CHECKING EMOTIONAL SECTORS...`}</p>
         </div>
 
-        <p className="mt-4 font-mono text-xs font-bold uppercase tracking-[0.18em] text-[#5F8F7B]">
-          Loading trail log
+        {/* Title */}
+        <h1 className="mt-6 text-center font-mono text-4xl sm:text-5xl font-black tracking-widest uppercase text-[var(--text-primary)] select-none">
+          SYSTEM_BOOT
+        </h1>
+
+        {/* Progress Bar */}
+        <div className="w-full border-2 border-[var(--text-primary)] bg-[var(--bg-main)] p-1 h-10 flex gap-0.5 items-center">
+          {Array.from({ length: 24 }).map((_, i) => (
+            <div
+              key={i}
+              className={cn(
+                "h-full flex-1 transition-colors duration-75",
+                i < progress ? "bg-[var(--text-primary)]" : "bg-transparent"
+              )}
+            />
+          ))}
+        </div>
+
+        {/* Restoration log */}
+        <p className="text-center font-mono text-xs sm:text-sm font-bold uppercase tracking-widest text-[var(--text-primary)] select-none">
+          [LOG] RESTORING LAST SESSION...
         </p>
-      </motion.div>
+      </div>
     </div>
   );
 }
@@ -577,6 +592,7 @@ function LandingPage({
 }) {
   const heroQuote = getLandingQuote();
   const [isNavCompact, setIsNavCompact] = useState(false);
+  const [activeSection, setActiveSection] = useState("top");
   const ref = useRef(null);
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -588,7 +604,22 @@ function LandingPage({
   const opacityY = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
 
   useEffect(() => {
-    const handleScroll = () => setIsNavCompact(window.scrollY > 80);
+    const handleScroll = () => {
+      setIsNavCompact(window.scrollY > 80);
+      
+      const sections = ["features", "about", "contact"];
+      let current = "top";
+      for (const section of sections) {
+        const el = document.getElementById(section);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          if (rect.top <= 120) {
+            current = section;
+          }
+        }
+      }
+      setActiveSection(current);
+    };
     handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
@@ -609,66 +640,62 @@ function LandingPage({
             className="object-cover object-[center_32%] opacity-95"
             priority
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#3E6B5A]/90 via-[#3E6B5A]/62 to-[#DDE7E1]/20" />
-          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#DDE7E1] to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#1E2B20]/90 via-[#1E2B20]/62 to-[#F4F1EA]/20" />
+          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#F4F1EA] to-transparent" />
         </motion.div>
 
-        <header className="fixed left-0 right-0 top-4 z-50 flex justify-center px-4">
-          <div
-            className={cn(
-              "flex items-center justify-between rounded-full border border-white/35 bg-[#F6FAF8]/78 text-[#3E6B5A] shadow-[0_18px_60px_rgba(36,71,59,0.22)] backdrop-blur-xl transition-all duration-500",
-              isNavCompact
-                ? "w-auto gap-3 px-3 py-2"
-                : "w-full max-w-5xl gap-5 px-4 py-3 sm:px-5"
-            )}
-          >
-            <a href="#top" className="flex min-w-0 items-center gap-3">
-              <LogoMark
-                className={cn(
-                  "transition-all duration-500",
-                  isNavCompact ? "h-12 w-12" : "h-16 w-16"
-                )}
-              />
-              <span className={cn("min-w-0 transition-all duration-300", isNavCompact && "hidden sm:block")}>
-                <span className="block whitespace-nowrap text-sm font-black leading-none tracking-tight sm:text-base">
+        <header className="fixed left-0 right-0 top-0 z-50 w-full border-b-2 border-[var(--text-primary)] bg-[var(--bg-main)] px-6 py-4 shadow-none">
+          <div className="mx-auto flex w-full max-w-7xl items-center justify-between">
+            <a href="#top" className="flex items-center gap-3">
+              <LogoMark className="h-20 w-20" />
+              <span className="block">
+                <span className="block text-sm font-black uppercase tracking-tight text-[var(--text-primary)]">
                   Trails & Tales
                 </span>
-                <span className={cn("mt-1 block whitespace-nowrap font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#5F8F7B]", isNavCompact && "hidden")}>
+                <span className="block font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
                   Memory archive
                 </span>
               </span>
             </a>
 
-            <nav className={cn("hidden items-center rounded-full bg-white/45 p-1 text-sm font-bold md:flex", isNavCompact ? "gap-1" : "gap-2")}>
-              {[
-                ["Features", "#features"],
-                ["About", "#about"],
-                ["Contact", "#contact"],
-              ].map(([label, href]) => (
-                <a
-                  key={label}
-                  href={href}
-                  className={cn(
-                    "rounded-full px-4 py-2 transition-colors hover:bg-[#EAF3EE]",
-                    isNavCompact && "px-3 py-1.5 text-xs"
-                  )}
-                >
-                  {label}
-                </a>
-              ))}
-            </nav>
+            <div className="flex items-center gap-6">
+              <nav className="hidden items-center gap-2 md:flex">
+                {[
+                  ["Features", "#features", "features"],
+                  ["About", "#about", "about"],
+                  ["Contact", "#contact", "contact"],
+                ].map(([label, href, sectionId]) => (
+                  <a
+                    key={label}
+                    href={href}
+                    className={cn(
+                      "px-3 py-1.5 text-sm font-bold transition-none border border-transparent",
+                      activeSection === sectionId
+                        ? "bg-[var(--accent)] text-[var(--text-primary)] border-[var(--text-primary)]"
+                        : "text-[var(--text-secondary)] hover:border-[var(--text-primary)]"
+                    )}
+                  >
+                    {label}
+                  </a>
+                ))}
+              </nav>
 
-            {!isSignedIn && (
-              <button
-                onClick={onSignIn}
-                className={cn(
-                  "rounded-full bg-[#3E6B5A] font-black text-[#F6FAF8] shadow-sm transition-all hover:bg-[#315A4C]",
-                  isNavCompact ? "px-4 py-2 text-xs" : "px-5 py-2.5 text-sm"
-                )}
-              >
-                Sign In
-              </button>
-            )}
+              {!isSignedIn ? (
+                <button
+                  onClick={onSignIn}
+                  className="bg-[var(--accent)] text-[var(--text-primary)] border-2 border-[var(--text-primary)] font-black text-sm px-4 py-2 hover:bg-[var(--accent-muted)] active:bg-[var(--text-primary)] active:text-[var(--accent)]"
+                >
+                  Sign In
+                </button>
+              ) : (
+                <button
+                  onClick={onEnter}
+                  className="bg-[var(--accent)] text-[var(--text-primary)] border-2 border-[var(--text-primary)] font-black text-sm px-4 py-2 hover:bg-[var(--accent-muted)] active:bg-[var(--text-primary)] active:text-[var(--accent)]"
+                >
+                  Open Journal
+                </button>
+              )}
+            </div>
           </div>
         </header>
 
@@ -677,11 +704,11 @@ function LandingPage({
           style={{ y: textY, opacity: opacityY }}
           className="pointer-events-none relative z-10 flex min-h-screen w-full flex-col items-start justify-start px-6 pt-36 sm:px-12 lg:items-end lg:pt-40"
         >
-          <div className="mb-5 flex max-w-xl items-start gap-3 rounded-md border border-white/35 bg-[#24473B]/35 px-4 py-3 text-[#F6FAF8] shadow-sm backdrop-blur-sm lg:mr-12">
+          <div className="mb-5 flex max-w-xl items-start gap-3 rounded-md border border-white/35 bg-[#2E4231]/35 px-4 py-3 text-[#F4F1EA] shadow-sm backdrop-blur-sm lg:mr-12">
             <Quote className="mt-0.5 h-4 w-4 flex-none" />
             <p className="text-sm font-semibold leading-6">{heroQuote}</p>
           </div>
-          <h1 className="max-w-4xl text-left font-serif text-6xl leading-[0.95] tracking-tight text-[#F6FAF8] drop-shadow-2xl sm:text-7xl lg:mr-12 lg:text-right lg:text-8xl">
+          <h1 className="max-w-4xl text-left font-serif text-6xl leading-[0.95] tracking-tight text-[#F4F1EA] drop-shadow-2xl sm:text-7xl lg:mr-12 lg:text-right lg:text-8xl">
             Archive your trails.
           </h1>
         </motion.div>
@@ -695,7 +722,7 @@ function LandingPage({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, duration: 1 }}
-            className="max-w-2xl text-xl font-serif leading-relaxed text-[#F6FAF8] drop-shadow-sm sm:text-3xl lg:mr-12 lg:text-right"
+            className="max-w-2xl text-xl font-serif leading-relaxed text-[#F4F1EA] drop-shadow-sm sm:text-3xl lg:mr-12 lg:text-right"
           >
             A calm retro journal for photos, maps, memories, and the tiny details that make a journey yours.
           </motion.p>
@@ -703,7 +730,7 @@ function LandingPage({
 
         <button
           onClick={onEnter}
-          className="retro-edge absolute bottom-10 left-6 z-30 flex items-center gap-3 rounded-md bg-[#EAF3EE] px-5 py-3 text-sm font-black text-[#3E6B5A] transition-transform hover:-translate-y-0.5 sm:left-12"
+          className="retro-edge absolute bottom-10 left-6 z-30 flex items-center gap-3 rounded-md bg-[#EAE6DC] px-5 py-3 text-sm font-black text-[#2E4231] transition-transform hover:-translate-y-0.5 sm:left-12"
         >
           {isSignedIn ? "Open Journal" : "Start Your Archive"}
           <ArrowRight className="h-4 w-4" />
@@ -716,11 +743,11 @@ function LandingPage({
               const featuresSection = document.getElementById('features');
               featuresSection?.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="group relative flex h-20 w-20 items-center justify-center rounded-full text-[#F6FAF8] hover:scale-105 transition-transform duration-500"
+            className="group relative flex h-20 w-20 items-center justify-center rounded-full text-[#F4F1EA] hover:scale-105 transition-transform duration-500"
           >
             <svg className="absolute inset-0 h-full w-full animate-[spin_12s_linear_infinite]" viewBox="0 0 100 100">
               <path id="textPath" d="M 50, 50 m -35, 0 a 35,35 0 1,1 70,0 a 35,35 0 1,1 -70,0" fill="transparent" />
-              <text fontSize="11" className="fill-[#F6FAF8] font-mono tracking-widest uppercase">
+              <text fontSize="11" className="fill-[#F4F1EA] font-mono tracking-widest uppercase">
                 <textPath href="#textPath" startOffset="0%">
                   SCROLL - SCROLL -
                 </textPath>
@@ -819,26 +846,26 @@ function LandingPage({
         </div>
       </section>
 
-      <footer className="relative overflow-hidden bg-[#1F3A33] px-6 py-16 text-[#F6FAF8] sm:px-10 lg:px-16">
+      <footer className="relative overflow-hidden bg-[#2E4231] px-6 py-16 text-[#F4F1EA] sm:px-10 lg:px-16">
         <div className="relative grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
           <div>
-            <LogoMark className="mb-6 h-28 w-28" />
-            <p className="font-mono text-xs font-black uppercase tracking-[0.22em] text-[#A8C9BA]">
+            <LogoMark className="mb-6 h-36 w-36" />
+            <p className="font-mono text-xs font-black uppercase tracking-[0.22em] text-[#566E5A]">
               Vanshika Pringle
             </p>
-            <h2 className="mt-3 max-w-3xl font-serif text-5xl leading-none text-[#F6FAF8] sm:text-6xl">
+            <h2 className="mt-3 max-w-3xl font-serif text-5xl leading-none text-[#F4F1EA] sm:text-6xl">
               Trails & Tales
             </h2>
-            <p className="mt-5 max-w-2xl text-base font-semibold leading-7 text-[#C9DED5]">
+            <p className="mt-5 max-w-2xl text-base font-semibold leading-7 text-[#EAE6DC]">
               A personal travel journal for preserving photos, maps, memories, and the quiet details that make every journey yours.
             </p>
           </div>
 
-          <div className="rounded-md border border-[#C9DED5]/25 bg-[#2A4A41] p-6">
-            <p className="font-mono text-xs font-black uppercase tracking-[0.2em] text-[#A8C9BA]">
+          <div className="rounded-md border border-[#EAE6DC]/25 bg-[#1E2B20] p-6">
+            <p className="font-mono text-xs font-black uppercase tracking-[0.2em] text-[#566E5A]">
               Contact
             </p>
-            <p className="mt-3 text-xl font-black text-[#F6FAF8]">
+            <p className="mt-3 text-xl font-black text-[#F4F1EA]">
               Build notes, ideas, or collaborations.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
@@ -847,7 +874,7 @@ function LandingPage({
               <SocialIconLink icon={<Linkedin className="h-5 w-5" />} label="LinkedIn" href="https://www.linkedin.com/in/vanshikapringle/" />
               <SocialIconLink icon={<Github className="h-5 w-5" />} label="GitHub" href="https://github.com/vanshikapringle" />
             </div>
-            <p className="mt-6 border-t border-[#C9DED5]/20 pt-4 text-sm font-semibold leading-6 text-[#C9DED5]">
+            <p className="mt-6 border-t border-[#EAE6DC]/20 pt-4 text-sm font-semibold leading-6 text-[#EAE6DC]">
               {getDailyQuote()}
             </p>
           </div>
@@ -897,7 +924,7 @@ function SocialIconLink({
       title={label}
       target={href.startsWith("http") ? "_blank" : undefined}
       rel={href.startsWith("http") ? "noreferrer" : undefined}
-      className="flex h-12 w-12 items-center justify-center rounded-full border border-[#C9DED5]/25 bg-[#F6FAF8] text-[#1F3A33] transition-all hover:-translate-y-0.5 hover:bg-[#C9DED5]"
+      className="flex h-12 w-12 items-center justify-center rounded-full border border-[#EAE6DC]/25 bg-[#EAE6DC] text-[#2E4231] transition-all hover:-translate-y-0.5 hover:bg-[#EAE6DC]/60"
     >
       {icon}
     </a>
@@ -1611,7 +1638,7 @@ function AnalyticsView({ memories }: { memories: Memory[] }) {
     );
   }
 
-  const colors = ["#5F8F7B", "#3E6B5A", "#DDE7E1", "#EAF3EE", "#F6FAF8"];
+  const colors = ["#2E4231", "#1E2B20", "#566E5A", "#EAE6DC", "#D97706"];
 
   return (
     <div className="grid gap-6">
@@ -1627,10 +1654,10 @@ function AnalyticsView({ memories }: { memories: Memory[] }) {
         <ChartPanel title="Monthly Memory Count">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={analytics.monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <XAxis dataKey="month" stroke="#5F8F7B" tickLine={false} axisLine={false} fontSize={12} />
-              <YAxis allowDecimals={false} stroke="#5F8F7B" tickLine={false} axisLine={false} fontSize={12} />
-              <Tooltip cursor={{ fill: '#EAF3EE' }} contentStyle={{ borderRadius: '6px', border: '1px solid rgba(62,107,90,0.28)', boxShadow: 'none' }} />
-              <Bar dataKey="count" fill="#5F8F7B" radius={[4, 4, 0, 0]} barSize={40} />
+              <XAxis dataKey="month" stroke="#2E4231" tickLine={false} axisLine={false} fontSize={12} />
+              <YAxis allowDecimals={false} stroke="#2E4231" tickLine={false} axisLine={false} fontSize={12} />
+              <Tooltip cursor={{ fill: '#EAE6DC' }} contentStyle={{ borderRadius: '6px', border: '1px solid rgba(30,43,32,0.15)', boxShadow: 'none' }} />
+              <Bar dataKey="count" fill="#2E4231" radius={[4, 4, 0, 0]} barSize={40} />
             </BarChart>
           </ResponsiveContainer>
         </ChartPanel>
@@ -1935,10 +1962,10 @@ function AuthUI({ onBack }: { onBack?: () => void }) {
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-[#24473B]/70" />
-        <div className="absolute inset-10 flex flex-col justify-between border border-white/25 p-8 text-[#F6FAF8]">
+        <div className="absolute inset-0 bg-[#2E4231]/70" />
+        <div className="absolute inset-10 flex flex-col justify-between border border-white/25 p-8 text-[#F4F1EA]">
           <a href="#top" className="flex items-center gap-3 text-lg font-black tracking-tight">
-            <LogoMark className="h-16 w-16" />
+            <LogoMark className="h-24 w-24" />
             <span>Trails & Tales</span>
           </a>
           <div>
@@ -1946,7 +1973,7 @@ function AuthUI({ onBack }: { onBack?: () => void }) {
             <p className="max-w-lg font-serif text-4xl leading-tight">
               {getLandingQuote()}
             </p>
-            <p className="mt-5 max-w-md text-sm font-medium leading-6 text-[#EAF3EE]">
+            <p className="mt-5 max-w-md text-sm font-medium leading-6 text-[#F4F1EA]">
               Keep every trail, photo, note, and place in one thoughtful archive.
             </p>
           </div>
@@ -1969,7 +1996,7 @@ function AuthUI({ onBack }: { onBack?: () => void }) {
         )}
 
         <div className="mb-8 text-center">
-          <LogoMark className="mx-auto mb-4 h-20 w-20" />
+          <LogoMark className="mx-auto mb-4 h-32 w-32" />
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             {isLogin ? "Welcome back" : "Create an account"}
           </h1>

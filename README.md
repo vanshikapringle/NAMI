@@ -1,7 +1,7 @@
 # NAMI
 
 <div align="center">
-  <img src="./frontend/public/logo.png" alt="Nami Logo" width="120" />
+  <img src="./frontend/public/favicon.png" alt="Nami Favicon" width="120" />
   <br />
   <h1>Your Personal Travel Archive</h1>
   <p>

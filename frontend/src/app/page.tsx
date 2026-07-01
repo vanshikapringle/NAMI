@@ -16,6 +16,7 @@ import {
   Map as MapIcon,
   Maximize2,
   Save,
+  Search,
   Star,
   Upload,
   User,
@@ -31,18 +32,8 @@ import {
   ShieldCheck,
   Images,
   Route,
+  Trash2,
 } from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import UploadModal from "@/components/UploadModal";
 import { supabase } from "@/lib/supabaseClient";
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
@@ -62,13 +53,13 @@ function LogoMark({
   imageClassName?: string;
 }) {
   return (
-    <span className={cn("relative block overflow-hidden", className)}>
+    <span className={cn("relative block flex-none overflow-visible", className)}>
       <Image
         src="/logo.png"
         alt="Trails & Tales logo"
         fill
-        sizes="96px"
-        className={cn("object-contain", imageClassName)}
+        sizes="256px"
+        className={cn("object-contain transition-transform duration-300", imageClassName)}
         priority
       />
     </span>
@@ -82,6 +73,23 @@ const MIN_SPLASH_MS = 2800;
 const MapViewComponent = dynamic(() => import("@/components/DynamicMap"), {
   ssr: false,
 });
+
+const AnalyticsView = dynamic(() => import("@/components/AnalyticsView"), {
+  ssr: false,
+});
+
+import TripView from "@/components/TripView";
+
+export type Trip = {
+  id: string;
+  name: string;
+  description?: string;
+  cover_image?: string;
+  start_date?: string;
+  end_date?: string;
+  start_location?: string;
+  end_location?: string;
+};
 
 type Memory = {
   id: string;
@@ -97,10 +105,13 @@ type Memory = {
   rating?: number;
   lat?: number;
   lng?: number;
+  trip_id?: string;
+  created_at?: string;
 };
 
 const tabs = [
   { id: "journal", label: "Journal", icon: Book },
+  { id: "trips", label: "Trips", icon: Route },
   { id: "map", label: "Journey Map", icon: MapIcon },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "profile", label: "Profile", icon: User },
@@ -144,12 +155,10 @@ const landingQuotes = [
 function getDisplayName(session: any) {
   const metadata = session?.user?.user_metadata || {};
   
-  // 1. Explicit first name
   if (metadata.first_name) {
     return metadata.first_name.trim();
   }
   
-  // 2. Full name or Name (extract first part)
   const fullName = metadata.full_name || metadata.name;
   if (fullName) {
     const firstPart = fullName.trim().split(/\s+/)[0];
@@ -158,28 +167,7 @@ function getDisplayName(session: any) {
     }
   }
 
-  // 3. Username or User Name (extract first part if it has separators)
-  const username = metadata.username || metadata.user_name;
-  if (username) {
-    const cleanUsername = username.replace(/[._-]/g, " ").trim();
-    const firstPart = cleanUsername.split(/\s+/)[0];
-    if (firstPart) {
-      return firstPart.charAt(0).toUpperCase() + firstPart.slice(1);
-    }
-  }
-  
-  // 4. Email prefix (extract first part)
-  const email = session?.user?.email;
-  if (email) {
-    const emailPrefix = email.split("@")[0];
-    const cleanEmail = emailPrefix.replace(/[._-]/g, " ").trim();
-    const firstPart = cleanEmail.split(/\s+/)[0];
-    if (firstPart) {
-      return firstPart.charAt(0).toUpperCase() + firstPart.slice(1);
-    }
-  }
-  
-  return "Vanshika";
+  return "Traveler";
 }
 
 
@@ -232,6 +220,7 @@ export default function Home() {
   const [selectedJournalLocation, setSelectedJournalLocation] = useState("All");
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [memories, setMemories] = useState<Memory[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [timeTick, setTimeTick] = useState(() => Date.now());
   const displayName = getDisplayName(session);
   const dashboardGreeting = useMemo(
@@ -262,6 +251,17 @@ export default function Home() {
       setMemories(data);
       localStorage.setItem(cacheKey, JSON.stringify(data));
     }
+    
+    // Also fetch trips
+    const { data: tripData } = await supabase
+      .from("trips")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .order("created_at", { ascending: false });
+      
+    if (tripData) {
+      setTrips(tripData);
+    }
   }, [cacheKey, session?.user?.id]);
 
   const handleMemoryUpdated = useCallback(
@@ -279,8 +279,25 @@ export default function Home() {
     [cacheKey]
   );
 
+  const handleMemoryDeleted = useCallback(
+    (deletedId: string) => {
+      setMemories((currentMemories) => {
+        const nextMemories = currentMemories.filter((memory) => memory.id !== deletedId);
+        if (cacheKey) {
+          localStorage.setItem(cacheKey, JSON.stringify(nextMemories));
+        }
+        return nextMemories;
+      });
+    },
+    [cacheKey]
+  );
+
   useEffect(() => {
-    const splashTimer = window.setTimeout(() => setSplashReady(true), MIN_SPLASH_MS);
+    const splashTimer = window.setTimeout(() => {
+      setSplashReady(true);
+      setCheckingSession(false);
+    }, MIN_SPLASH_MS);
+
     const storedTab = localStorage.getItem(ACTIVE_TAB_KEY);
     if (storedTab && tabs.some((tab) => tab.id === storedTab)) {
       setActiveTab(storedTab);
@@ -288,6 +305,8 @@ export default function Home() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      setCheckingSession(false);
+    }).catch(() => {
       setCheckingSession(false);
     });
 
@@ -348,7 +367,7 @@ export default function Home() {
     <div className="flex min-h-screen bg-background">
       <aside className="sticky top-0 hidden h-screen w-72 flex-col bg-[var(--sidebar-bg)] px-6 py-8 lg:flex">
         <div className="mb-10 flex items-center gap-3">
-          <LogoMark className="h-24 w-24" />
+          <LogoMark className="h-14 w-14" />
           <div>
             <h1 className="text-xl font-bold tracking-tight text-[var(--text-on-dark)]">Trails & Tales</h1>
             <p className="text-xs font-medium text-[var(--text-on-dark)]/70">Memory archive</p>
@@ -426,7 +445,7 @@ export default function Home() {
       <main className="flex-1 pb-24 lg:pb-0">
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-white/80 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur-md lg:px-10">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <LogoMark className="hidden h-16 w-16 sm:h-24 sm:w-24 flex-none sm:block lg:hidden" />
+            <LogoMark className="hidden h-12 w-12 flex-none sm:block lg:hidden" />
             <div className="min-w-0">
               <p className="mb-0.5 sm:mb-1 flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
                 <Sparkles className="h-3 sm:h-3.5 w-3 sm:w-3.5" />
@@ -471,18 +490,35 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
+              className="w-full min-w-0"
             >
               {activeTab === "journal" && (
                 <JournalView
                   memories={memories}
                   onMemoryUpdated={handleMemoryUpdated}
+                  onMemoryDeleted={handleMemoryDeleted}
                   selectedLocation={selectedJournalLocation}
                   onLocationChange={setSelectedJournalLocation}
+                />
+              )}
+              {activeTab === "trips" && (
+                <TripView
+                  trips={trips}
+                  memories={memories}
+                  onMemoryClick={() => {
+                    // Could add memory detailed view later
+                  }}
+                  onTripUpdated={(updatedTrip) => {
+                    setTrips((prevTrips) => 
+                      prevTrips.map((t) => (t.id === updatedTrip.id ? updatedTrip : t))
+                    );
+                  }}
                 />
               )}
               {activeTab === "map" && (
                 <MapView
                   memories={memories}
+                  trips={trips}
                   onLocationSelect={(locationName) => {
                     setSelectedJournalLocation(locationName);
                     updateActiveTab("journal");
@@ -515,6 +551,9 @@ export default function Home() {
       </main>
 
       <UploadModal
+        existingLocations={Array.from(new Set(memories.map(m => m.location_name).filter(Boolean))) as string[]}
+        existingMemories={memories}
+        existingTrips={trips}
         isOpen={isUploadModalOpen}
         onClose={() => {
           setIsUploadModalOpen(false);
@@ -647,7 +686,7 @@ function LandingPage({
         <header className="fixed left-0 right-0 top-0 z-50 w-full border-b-2 border-[var(--text-primary)] bg-[var(--bg-main)] px-6 py-4 shadow-none">
           <div className="mx-auto flex w-full max-w-7xl items-center justify-between">
             <a href="#top" className="flex items-center gap-3">
-              <LogoMark className="h-20 w-20" />
+              <LogoMark className="h-12 w-12" />
               <span className="block">
                 <span className="block text-sm font-black uppercase tracking-tight text-[var(--text-primary)]">
                   Trails & Tales
@@ -993,17 +1032,60 @@ function LandingNote({
 function JournalView({
   memories,
   onMemoryUpdated,
+  onMemoryDeleted,
   selectedLocation,
   onLocationChange,
 }: {
   memories: Memory[];
   onMemoryUpdated: (memory: Memory) => void;
+  onMemoryDeleted: (id: string) => void;
   selectedLocation: string;
   onLocationChange: (location: string) => void;
 }) {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [lightboxMemory, setLightboxMemory] = useState<Memory | null>(null);
   const [editingMemory, setEditingMemory] = useState<Memory | null>(null);
+  const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set());
+  
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<string[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults(null);
+      return;
+    }
+    const timeout = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch("http://localhost:8000/v1/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: searchQuery, limit: 20, memories: memories })
+        });
+        const data = await res.json();
+        if (data.success && data.data?.results) {
+          setSearchResults(data.data.results.map((r: any) => r.memory_id));
+        } else {
+          setSearchResults([]);
+        }
+      } catch (err) {
+        console.error("Search failed:", err);
+      }
+      setIsSearching(false);
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [searchQuery, memories]);
+
+  const toggleLocation = (loc: string) => {
+    setExpandedLocations((prev) => {
+      const next = new Set(prev);
+      if (next.has(loc)) next.delete(loc);
+      else next.add(loc);
+      return next;
+    });
+  };
 
   if (!memories.length) {
     return (
@@ -1027,10 +1109,28 @@ function JournalView({
       : memories.filter(
           (memory) => (memory.category || "Uncategorized") === selectedCategory
         );
+  const normalizeLocation = (loc: string | null) => {
+    if (!loc || loc === "Unknown Location") return "UNKNOWN LOCATION";
+    // Split by comma
+    const parts = loc
+      .split(",")
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0 && !/^\d+$/.test(p) && !/^\w*\d+\w*$/.test(p)); // Filter out numeric parts like pincodes/house numbers
+      
+    if (parts.length > 1) {
+      // Typically the first part is a specific place/city, and the last is the country
+      // If there are many parts, picking first and last provides a clean "City, Country" look.
+      // But if parts[0] is too specific (e.g. "Sector 18"), maybe just taking the first part is cleaner for a group title.
+      // To be safe and clean, let's just take the first part, or City + Country.
+      return `${parts[0]}, ${parts[parts.length - 1]}`.toUpperCase();
+    }
+    return parts.join(", ").toUpperCase();
+  };
+
   const locations = [
     "All",
     ...Array.from(
-      new Set(visibleMemories.map((memory) => memory.location_name || "Unknown Location"))
+      new Set(visibleMemories.map((memory) => normalizeLocation(memory.location_name)))
     ).sort(),
   ];
   const locationMemories =
@@ -1038,21 +1138,53 @@ function JournalView({
       ? visibleMemories
       : visibleMemories.filter(
           (memory) =>
-            (memory.location_name || "Unknown Location") === selectedLocation
+            normalizeLocation(memory.location_name) === selectedLocation
         );
+
+  const searchedMemories = searchResults === null 
+    ? locationMemories 
+    : locationMemories.filter(m => searchResults.includes(m.id));
+
   const groupedMemories = Array.from(
-    locationMemories.reduce<Map<string, Memory[]>>((groups, memory) => {
-      const locationName = memory.location_name || "Unknown Location";
-      const current = groups.get(locationName) || [];
+    searchedMemories.reduce<Map<string, Memory[]>>((groups, memory) => {
+      const locationName = normalizeLocation(memory.location_name);
+      // Create groups based on Location + Visit Date
+      const dateObj = new Date(memory.visit_date || memory.created_at);
+      const visitDate = isNaN(dateObj.getTime()) ? "Unknown Date" : dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const groupKey = `${locationName} - Visit - ${visitDate}`;
+      
+      const current = groups.get(groupKey) || [];
       current.push(memory);
-      groups.set(locationName, current);
+      groups.set(groupKey, current);
       return groups;
     }, new Map())
-  ).sort(([a], [b]) => a.localeCompare(b));
+  ).sort(([a], [b]) => {
+    // Basic alphabetical sort by group key
+    return a.localeCompare(b);
+  });
 
   return (
     <>
       <div className="mb-6 grid gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+        
+        {/* Semantic Search Bar */}
+        <div>
+          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
+            <Search className="h-4 w-4" />
+            Semantic Search
+            {isSearching && <span className="text-xs text-primary animate-pulse ml-2">Thinking...</span>}
+          </div>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search memories by meaning, e.g. 'relaxing on the beach' or 'snowy mountains'..."
+              className="w-full rounded-xl border-2 border-border bg-background px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors focus:border-primary focus:ring-4 focus:ring-primary/10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
         <div>
           <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
             <Filter className="h-4 w-4" />
@@ -1122,98 +1254,151 @@ function JournalView({
                     {locationName}
                   </h3>
                 </div>
-                <p className="text-sm font-semibold text-muted-foreground">
-                  {locationEntries.length} {locationEntries.length === 1 ? "entry" : "entries"}
-                </p>
+                <div className="flex gap-2 text-sm font-medium text-muted-foreground">
+                  <span className="rounded-full bg-secondary px-3 py-1 text-xs">
+                    {locationEntries.length} memories
+                  </span>
+                </div>
               </div>
 
-              <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                {locationEntries.map((mem) => (
-                  <motion.article
-                    key={mem.id}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    whileHover={{ y: -4 }}
-                    className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:shadow-md"
+              {!expandedLocations.has(locationName) ? (
+                <div className="flex justify-center py-10">
+                  <div 
+                    className="journal-stack"
+                    onClick={() => toggleLocation(locationName)}
                   >
-                    {mem.image_url ? (
-                      <button
-                        type="button"
-                        onClick={() => setLightboxMemory(mem)}
-                        className="relative aspect-[4/3] w-full overflow-hidden bg-secondary text-left"
-                        aria-label={`Open ${mem.title} image`}
-                      >
-                        <Image
-                          src={mem.image_url}
-                          alt={mem.title}
-                          fill
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                          className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                        {mem.category && (
-                          <div className="absolute left-3 top-3 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold tracking-wide text-white backdrop-blur-md">
-                            {mem.category}
+                    <div className="journal-stack-card group relative">
+                      <div className="journal-stack-image">
+                        {locationEntries[0].image_url ? (
+                          <img 
+                            src={locationEntries[0].image_url} 
+                            alt={locationEntries[0].title}
+                            className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center bg-secondary text-muted-foreground">
+                            No photo
                           </div>
                         )}
-                        <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-black/55 px-3 py-1 text-xs font-bold text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100">
-                          <Maximize2 className="h-3.5 w-3.5" />
-                          View
-                        </div>
-                      </button>
-                    ) : (
-                      <div className="flex aspect-[4/3] w-full items-center justify-center bg-secondary">
-                        <Camera className="h-10 w-10 text-muted-foreground/30" />
                       </div>
-                    )}
-
-                    <div className="flex flex-1 flex-col p-5">
-                      <div className="mb-3 flex items-center justify-between text-xs font-medium text-muted-foreground">
-                        <div className="flex items-center gap-1.5 bg-secondary px-2 py-1 rounded-md">
-                          <Calendar className="h-3 w-3" />
-                          {mem.visit_date}
-                        </div>
-                        <div className="flex items-center gap-1.5 truncate max-w-[140px]">
-                          <MapPin className="h-3 w-3" />
-                          <span className="truncate">{mem.location_name || "Unknown"}</span>
-                        </div>
-                      </div>
-
-                      <h3 className="mb-2 text-xl font-bold tracking-tight text-foreground line-clamp-1">
-                        {mem.title}
-                      </h3>
-                      
-                      <p className="mb-4 text-sm leading-relaxed text-muted-foreground line-clamp-2">
-                        {mem.description || "No journal entry added."}
+                      <p className="mt-4 text-center font-bold text-foreground">
+                        {locationEntries.length} Photos
                       </p>
-
-                      <div className="mt-auto flex items-center justify-between gap-4 border-t border-border pt-4 text-sm">
-                        <div className="flex min-w-0 items-center gap-4">
-                          {mem.rating && (
-                            <div className="flex items-center gap-1 font-semibold text-yellow-500">
-                              <Star className="h-4 w-4 fill-current" />
-                              {mem.rating}/5
-                            </div>
-                          )}
-                          {mem.time_spent && (
-                            <div className="flex items-center gap-1.5 truncate font-medium text-muted-foreground">
-                              <Clock className="h-4 w-4 flex-none" />
-                              <span className="truncate">{mem.time_spent}</span>
-                            </div>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setEditingMemory(mem)}
-                          className="flex flex-none items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-bold text-foreground transition-colors hover:bg-secondary"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                          Edit
-                        </button>
-                      </div>
                     </div>
-                  </motion.article>
-                ))}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => toggleLocation(locationName)}
+                    className="mb-4 text-sm font-bold text-primary hover:underline"
+                  >
+                    ← Back to Stack
+                  </button>
+                  <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                {locationEntries.map((mem, i) => {
+                  const rValue = (i % 2 === 0 ? 1 : -1) * (2 + (i % 3)); // Generates -2, 3, -4, 2, -3 etc.
+                  return (
+                    <motion.div
+                      key={mem.id}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="group relative flex h-full w-full items-center justify-center perspective-[1000px]"
+                    >
+                      <article
+                        className="flex h-full w-full flex-col bg-white p-4 border-4 border-foreground shadow-[8px_8px_0_var(--foreground)] transition-all duration-300 group-hover:z-10 group-hover:mx-2 group-hover:-translate-y-2 group-hover:shadow-[12px_12px_0_var(--foreground)]"
+                      >
+                        {mem.image_url ? (
+                          <button
+                            type="button"
+                            onClick={() => setLightboxMemory(mem)}
+                            className="relative aspect-square w-full flex-none overflow-hidden border-4 border-foreground bg-secondary text-left"
+                            aria-label={`Open ${mem.title} image`}
+                          >
+                            <Image
+                              src={mem.image_url}
+                              alt={mem.title}
+                              fill
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                              className="object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+                            {mem.category && (
+                              <div className="absolute left-2 top-2 bg-foreground px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-background">
+                                {mem.category}
+                              </div>
+                            )}
+                            <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-foreground px-2 py-1 text-xs font-bold text-background opacity-0 transition-opacity group-hover:opacity-100">
+                              <Maximize2 className="h-3.5 w-3.5" />
+                              View
+                            </div>
+                          </button>
+                        ) : (
+                          <div className="flex aspect-square w-full items-center justify-center border-4 border-foreground bg-secondary">
+                            <Camera className="h-10 w-10 text-muted-foreground/30" />
+                          </div>
+                        )}
+
+                        <div className="mt-4 flex flex-1 flex-col">
+                          <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase text-foreground">
+                            <div className="flex items-center gap-1.5 bg-secondary px-2 py-1">
+                              <Calendar className="h-3 w-3" />
+                              {mem.visit_date}
+                            </div>
+                            <div className="flex items-center gap-1.5 truncate max-w-[140px]">
+                              <MapPin className="h-3 w-3" />
+                              <span className="truncate">{mem.location_name || "Unknown"}</span>
+                            </div>
+                          </div>
+
+                          <h3 className="mb-2 text-lg font-black uppercase tracking-tight text-foreground line-clamp-1">
+                            {mem.title}
+                          </h3>
+                          
+                          <p className="mb-4 text-xs font-medium text-muted-foreground line-clamp-2">
+                            {mem.description || "No journal entry added."}
+                          </p>
+
+                          <div className="mt-auto flex items-center justify-between border-t-2 border-foreground pt-3 text-xs font-black text-foreground">
+                            <div className="flex min-w-0 items-center gap-3">
+                              {mem.rating && (
+                                <div className="flex items-center gap-1 text-yellow-500">
+                                  <Star className="h-4 w-4 fill-current" />
+                                  {mem.rating}/5
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setEditingMemory(mem)}
+                                className="flex items-center gap-1.5 bg-secondary px-3 py-1.5 uppercase hover:bg-foreground hover:text-background border-2 border-foreground transition-colors"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (window.confirm(`Are you sure you want to delete "${mem.title}"?`)) {
+                                    await supabase.from("memories").delete().eq("id", mem.id);
+                                    onMemoryDeleted(mem.id);
+                                  }
+                                }}
+                                className="flex items-center gap-1.5 bg-red-50 text-red-600 px-3 py-1.5 uppercase hover:bg-red-600 hover:text-white border-2 border-red-600 transition-colors"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    </motion.div>
+                  );
+                })}
               </div>
+              </>
+              )}
             </section>
           ))}
         </div>
@@ -1228,6 +1413,10 @@ function JournalView({
         onClose={() => setEditingMemory(null)}
         onSaved={(updatedMemory) => {
           onMemoryUpdated(updatedMemory);
+          setEditingMemory(null);
+        }}
+        onDeleted={(deletedId) => {
+          onMemoryDeleted(deletedId);
           setEditingMemory(null);
         }}
       />
@@ -1287,10 +1476,12 @@ function EditMemoryModal({
   memory,
   onClose,
   onSaved,
+  onDeleted,
 }: {
   memory: Memory | null;
   onClose: () => void;
   onSaved: (memory: Memory) => void;
+  onDeleted: (id: string) => void;
 }) {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Uncategorized");
@@ -1449,15 +1640,33 @@ function EditMemoryModal({
                 </EditField>
               </div>
 
-              <div className="mt-8 flex justify-end gap-3 border-t border-border pt-6">
+              <div className="mt-8 flex items-center justify-between border-t border-border pt-6">
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={async () => {
+                    if (memory && window.confirm("Are you sure you want to permanently delete this memory?")) {
+                      setSaving(true);
+                      await supabase.from("memories").delete().eq("id", memory.id);
+                      setSaving(false);
+                      onDeleted(memory.id);
+                      onClose();
+                    }
+                  }}
                   disabled={saving}
-                  className="rounded-xl px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
                 >
-                  Cancel
+                  <Trash2 className="h-4 w-4" />
+                  Delete Entry
                 </button>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    disabled={saving}
+                    className="rounded-xl px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
                 <button
                   type="submit"
                   disabled={saving}
@@ -1476,6 +1685,7 @@ function EditMemoryModal({
                   )}
                 </button>
               </div>
+            </div>
             </motion.form>
           </div>
         </>
@@ -1505,9 +1715,11 @@ function EditField({
 
 function MapView({
   memories,
+  trips,
   onLocationSelect,
 }: {
   memories: Memory[];
+  trips: Trip[];
   onLocationSelect: (locationName: string) => void;
 }) {
   const validMemories = memories.filter((m) => m.lat != null && m.lng != null);
@@ -1534,6 +1746,7 @@ function MapView({
       <div className="h-[350px] sm:h-[500px] lg:h-[600px] w-full bg-secondary relative z-0">
         <MapViewComponent
           memories={validMemories}
+          trips={trips}
           onLocationSelect={onLocationSelect}
         />
       </div>
@@ -1541,187 +1754,7 @@ function MapView({
   );
 }
 
-function AnalyticsView({ memories }: { memories: Memory[] }) {
-  const analytics = useMemo(() => {
-    const sorted = [...memories].sort(
-      (a, b) =>
-        new Date(a.visit_date).getTime() - new Date(b.visit_date).getTime()
-    );
-
-    let totalTrips = sorted.length ? 1 : 0;
-    for (let i = 1; i < sorted.length; i++) {
-      const previousDate = new Date(sorted[i - 1].visit_date);
-      const currentDate = new Date(sorted[i].visit_date);
-      const diffDays =
-        (currentDate.getTime() - previousDate.getTime()) /
-        (1000 * 60 * 60 * 24);
-
-      if (diffDays > 20) totalTrips++;
-    }
-
-    const categoryCounts = sorted.reduce<Record<string, number>>((acc, mem) => {
-      const category = mem.category || "Uncategorized";
-      acc[category] = (acc[category] || 0) + 1;
-      return acc;
-    }, {});
-
-    const monthlyCounts = sorted.reduce<Record<string, number>>((acc, mem) => {
-      const month = new Date(mem.visit_date).toLocaleString("default", {
-        month: "short",
-      });
-      acc[month] = (acc[month] || 0) + 1;
-      return acc;
-    }, {});
-
-    const yearlyCounts = sorted.reduce<Record<string, number>>((acc, mem) => {
-      const year = new Date(mem.visit_date).getFullYear().toString();
-      acc[year] = (acc[year] || 0) + 1;
-      return acc;
-    }, {});
-
-    const categoryData = Object.entries(categoryCounts).map(([name, value]) => ({
-      name,
-      value,
-    }));
-
-    const monthlyData = Object.entries(monthlyCounts).map(([month, count]) => ({
-      month,
-      count,
-    }));
-
-    const yearlyData = Object.entries(yearlyCounts).map(([year, count]) => ({
-      year,
-      count,
-    }));
-
-    const favoriteCategory = categoryData.length
-      ? categoryData.reduce((max, current) =>
-          current.value > max.value ? current : max
-        ).name
-      : "None";
-
-    const mostActiveMonth = monthlyData.length
-      ? monthlyData.reduce((max, current) =>
-          current.count > max.count ? current : max
-        ).month
-      : "N/A";
-
-    const rated = sorted.filter((mem) => typeof mem.rating === "number");
-    const averageRating = rated.length
-      ? (
-          rated.reduce((sum, mem) => sum + Number(mem.rating), 0) /
-          rated.length
-        ).toFixed(1)
-      : "N/A";
-
-    return {
-      totalPlaces: sorted.length,
-      totalTrips,
-      categoryData,
-      monthlyData,
-      yearlyData,
-      favoriteCategory,
-      mostActiveMonth,
-      uniqueCities: new Set(sorted.map((m) => m.location_name).filter(Boolean))
-        .size,
-      averageRating,
-    };
-  }, [memories]);
-
-  if (!memories.length) {
-    return (
-      <EmptyState
-        icon={<BarChart3 className="h-8 w-8 text-primary" />}
-        title="No analytics yet"
-        description="Upload a few memories to unlock insights about your travels."
-      />
-    );
-  }
-
-  const colors = ["#2E4231", "#1E2B20", "#566E5A", "#EAE6DC", "#D97706"];
-
-  return (
-    <div className="grid gap-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <Stat label="Places" value={analytics.totalPlaces} />
-        <Stat label="Trips" value={analytics.totalTrips} />
-        <Stat label="Cities" value={analytics.uniqueCities} />
-        <Stat label="Top Tag" value={analytics.favoriteCategory} />
-        <Stat label="Avg Rating" value={analytics.averageRating} />
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <ChartPanel title="Monthly Memory Count">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={analytics.monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <XAxis dataKey="month" stroke="#2E4231" tickLine={false} axisLine={false} fontSize={12} />
-              <YAxis allowDecimals={false} stroke="#2E4231" tickLine={false} axisLine={false} fontSize={12} />
-              <Tooltip cursor={{ fill: '#EAE6DC' }} contentStyle={{ borderRadius: '6px', border: '1px solid rgba(30,43,32,0.15)', boxShadow: 'none' }} />
-              <Bar dataKey="count" fill="#2E4231" radius={[4, 4, 0, 0]} barSize={40} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartPanel>
-
-        <ChartPanel title="Category Mix">
-          <ResponsiveContainer width="100%" height={280}>
-            <PieChart>
-              <Pie
-                data={analytics.categoryData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={95}
-                innerRadius={60}
-                stroke="none"
-                label
-              >
-                {analytics.categoryData.map((entry, index) => (
-                  <Cell
-                    key={entry.name}
-                    fill={colors[index % colors.length]}
-                  />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid rgba(62,107,90,0.28)', boxShadow: 'none' }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </ChartPanel>
-      </div>
-
-      <p className="text-sm font-medium text-muted-foreground bg-white px-4 py-3 rounded-xl border border-border inline-block w-max shadow-sm">
-        Most active month: <strong className="text-foreground">{analytics.mostActiveMonth}</strong>
-      </p>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <motion.div 
-      whileHover={{ y: -2 }}
-      className="rounded-2xl border border-border bg-card p-5 shadow-sm"
-    >
-      <p className="text-sm font-medium text-muted-foreground">{label}</p>
-      <p className="mt-2 text-3xl font-black tracking-tight text-foreground">{value}</p>
-    </motion.div>
-  );
-}
-
-function ChartPanel({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-      <h3 className="mb-6 text-lg font-bold tracking-tight text-foreground">{title}</h3>
-      {children}
-    </section>
-  );
-}
+// AnalyticsView moved to src/components/AnalyticsView.tsx
 
 function ProfileView({
   session,
@@ -1965,7 +1998,7 @@ function AuthUI({ onBack }: { onBack?: () => void }) {
         <div className="absolute inset-0 bg-[#2E4231]/70" />
         <div className="absolute inset-10 flex flex-col justify-between border border-white/25 p-8 text-[#F4F1EA]">
           <a href="#top" className="flex items-center gap-3 text-lg font-black tracking-tight">
-            <LogoMark className="h-24 w-24" />
+            <LogoMark className="h-12 w-12" />
             <span>Trails & Tales</span>
           </a>
           <div>

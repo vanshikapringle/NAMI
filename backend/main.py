@@ -1,21 +1,28 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
+import logging
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 import uvicorn
-import os
-from typing import List, Optional
-import piexif
-from PIL import Image
-import io
-import urllib.request
-import json
-from dotenv import load_dotenv
+from utils.config import settings
+from core.logging import setup_logging
+from core.exceptions import NAMIException
+from api.upload import router as upload_router, analyze_image
+from api.search import router as search_router
+from api.analytics import router as analytics_router
+from api.chat import router as chat_router
+from api.location import router as location_router
 
-load_dotenv()
+# Initialize Global Structured Logging
+setup_logging()
+logger = logging.getLogger("nami_backend")
 
-app = FastAPI(title="NAMI - Trails & Tales")
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    description="Scalable Production AI Backend Architecture for NAMI V2 (AI-powered Travel Intelligence Platform)"
+)
 
-# Enable CORS for frontend
+# Configure CORS for frontend access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,89 +31,60 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class Memory(BaseModel):
-    title: str
-    description: str
-    location: str
-    date: str
-    lat: Optional[float] = None
-    lng: Optional[float] = None
+# Exception Handler for Custom Domain Exceptions
+@app.exception_handler(NAMIException)
+async def nami_exception_handler(request: Request, exc: NAMIException):
+    logger.warning(f"Domain exception raised on {request.url.path}: {exc.message}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"success": False, "error_code": exc.__class__.__name__, "detail": exc.message}
+    )
+
+# Register API Routers
+app.include_router(upload_router, prefix=settings.API_PREFIX)
+app.include_router(search_router, prefix=settings.API_PREFIX)
+app.include_router(analytics_router, prefix=settings.API_PREFIX)
+app.include_router(chat_router, prefix=settings.API_PREFIX)
+app.include_router(location_router, prefix=settings.API_PREFIX)
 
 @app.get("/")
-def read_root():
-    return {"message": "Welcome to NAMI API"}
-
-def get_exif_data(image_bytes):
-    try:
-        img = Image.open(io.BytesIO(image_bytes))
-        exif_dict = piexif.load(img.info.get("exif", b""))
-        return exif_dict
-    except Exception as e:
-        return None
-
-def get_lat_lng_from_exif(exif_dict):
-    if not exif_dict or "GPS" not in exif_dict:
-        return None, None
-    try:
-        gps_info = exif_dict["GPS"]
-        if piexif.GPSIFD.GPSLatitude in gps_info and piexif.GPSIFD.GPSLongitude in gps_info:
-            lat = gps_info[piexif.GPSIFD.GPSLatitude]
-            lng = gps_info[piexif.GPSIFD.GPSLongitude]
-            lat_ref = gps_info.get(piexif.GPSIFD.GPSLatitudeRef, b'N').decode('utf-8')
-            lng_ref = gps_info.get(piexif.GPSIFD.GPSLongitudeRef, b'E').decode('utf-8')
-
-            def convert_to_degrees(value):
-                d, m, s = value
-                return d[0]/d[1] + (m[0]/m[1])/60.0 + (s[0]/s[1])/3600.0
-
-            lat_deg = convert_to_degrees(lat)
-            lng_deg = convert_to_degrees(lng)
-
-            if lat_ref != 'N': lat_deg = -lat_deg
-            if lng_ref != 'E': lng_deg = -lng_deg
-
-            return lat_deg, lng_deg
-        return None, None
-    except Exception:
-        return None, None
-
-
-@app.post("/upload-photo")
-async def upload_photo(file: UploadFile = File(...)):
-    if not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="Invalid file type")
-    
-    contents = await file.read()
-    exif = get_exif_data(contents)
-    lat, lng = get_lat_lng_from_exif(exif)
-    
-    location_name = "Unknown Location"
-    if lat is not None and lng is not None:
-        try:
-            url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lng}&zoom=10"
-            req = urllib.request.Request(url, headers={'User-Agent': 'NAMI-App/1.0 (local dev)'})
-            with urllib.request.urlopen(req, timeout=5) as response:
-                data = json.loads(response.read().decode())
-                addr = data.get('address', {})
-                city = addr.get('city', addr.get('town', addr.get('county', '')))
-                state = addr.get('state', '')
-                country = addr.get('country', '')
-                
-                parts = [p for p in [city, state, country] if p]
-                if parts:
-                    location_name = ", ".join(parts[:2])
-                else:
-                    name_parts = data.get('display_name', 'Unknown Location').split(',')
-                    location_name = name_parts[0].strip() if name_parts else "Unknown Location"
-        except Exception as e:
-            print("Geocoding error:", e)
-
+def health_check():
+    """Service health check endpoint."""
     return {
-        "filename": file.filename,
-        "lat": lat,
-        "lng": lng,
-        "location_name": location_name
+        "project": settings.PROJECT_NAME,
+        "version": settings.VERSION,
+        "status": "operational"
     }
+
+@app.post("/upload-photo", tags=["Legacy Compatibility"])
+async def legacy_upload_photo(file: UploadFile = File(...)):
+    """
+    Backward-compatible wrapper route ensuring existing UploadModal frontend functions seamlessly.
+    Delegates execution to the new Smart Upload Pipeline and formats the response for legacy clients.
+    """
+    try:
+        analysis = await analyze_image(image=file)
+        location_name = analysis.location.formatted_address
+        if analysis.location.city != "Unknown City":
+            location_name = f"{analysis.location.city}, {analysis.location.country}"
+            
+        return {
+            "filename": file.filename,
+            "lat": analysis.metadata.latitude,
+            "lng": analysis.metadata.longitude,
+            "location_name": location_name,
+            "duplicate": {
+                "is_duplicate": analysis.duplicate.is_duplicate,
+                "matched_image": analysis.duplicate.matched_image,
+                "similarity_score": analysis.duplicate.similarity_score
+            },
+            "timestamp": analysis.metadata.timestamp
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Legacy upload error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Legacy Upload Execution Failed")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

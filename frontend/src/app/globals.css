@@ -4,6 +4,62 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  /* Journal Card Stack Interaction */
+  .journal-stack {
+    width: 100%;
+    max-width: 400px;
+    transition: 0.25s ease;
+  }
+  .journal-stack:hover {
+    transform: rotate(5deg);
+  }
+  .journal-stack:hover .journal-stack-card:before {
+    transform: translateY(-2%) rotate(-4deg);
+  }
+  .journal-stack:hover .journal-stack-card:after {
+    transform: translateY(2%) rotate(4deg);
+  }
+  .journal-stack-card {
+    aspect-ratio: 3 / 2;
+    border: 4px solid var(--text-primary);
+    background-color: var(--bg-main);
+    position: relative;
+    transition: 0.15s ease;
+    cursor: pointer;
+    padding: 5% 5% 15% 5%;
+  }
+  .journal-stack-card:before,
+  .journal-stack-card:after {
+    content: '';
+    display: block;
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    border: 4px solid var(--text-primary);
+    background-color: #E2D9F3;
+    transform-origin: center center;
+    z-index: -1;
+    transition: 0.15s ease;
+    top: 0;
+    left: 0;
+  }
+  .journal-stack-card:before {
+    transform: translateY(-2%) rotate(-6deg);
+  }
+  .journal-stack-card:after {
+    transform: translateY(2%) rotate(6deg);
+  }
+  .journal-stack-image {
+    width: 100%;
+    border: 4px solid var(--text-primary);
+    background-color: var(--text-secondary);
+    aspect-ratio: 1 / 1;
+    position: relative;
+    overflow: hidden;
+  }
+}
+
 @layer base {
   :root {
     /* Layout Canvas & Typography */
@@ -191,7 +247,7 @@
 }
 
 /* Scaled Icons and SVG Outlines */
-svg {
+svg:not(.leaflet-container svg) {
   width: 1.25em !important;
   height: 1.25em !important;
   stroke-width: 2.25 !important; /* Slightly thicker strokes for retro clarity */
@@ -444,4 +500,63 @@ footer a:not(.btn):hover {
   0% { opacity: 0.99; }
   50% { opacity: 1; }
   100% { opacity: 0.99; }
+}
+
+/* Custom Animated Map Pins */
+:root {
+  --city-radius: 1.5rem;
+  --city-sign-color-back: #2E4231;
+  --city-sign-color-font: #F4F1EA;
+  --city-pin-size-font: 1.2rem;
+}
+
+.map-city-marker {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  border-radius: var(--city-radius);
+  padding: var(--city-radius);
+}
+
+.map-city-marker::before {
+  content: "•";
+  left: calc(-50% + var(--city-radius));
+  position: absolute;
+  top: calc(-0.65em + var(--city-radius));
+  text-align: center;
+  text-shadow: 0 1px 1px #000;
+  width: 100%;
+  font-size: var(--city-pin-size-font);
+  color: var(--text-primary);
+}
+
+.map-city-marker::after {
+  clip-path: inset(-0.5em 0 0 0);
+  content: "📍";
+  left: calc(-50% + var(--city-radius));
+  position: absolute;
+  top: calc(-1em + var(--city-radius));
+  text-align: center;
+  transition: all 300ms ease-out;
+  width: 100%;
+  font-size: var(--city-pin-size-font);
+}
+
+.map-city-marker:hover::after {
+  clip-path: inset(-0.5em 0 0.5em 0);
+  transform: translateY(0.5em);
+}
+
+.map-city__label {
+  display: none;
+  left: calc(-5em + 50%);
+  position: absolute;
+  text-align: center;
+  width: 10em;
+  z-index: 999;
+}
+
+.map-city-marker:hover .map-city__label {
+  animation: fadein 300ms forwards ease-out;
+  display: block;
 }

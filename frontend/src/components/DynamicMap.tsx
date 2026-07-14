@@ -83,7 +83,7 @@ function MapReplayController({
   onComplete,
 }: {
   memories: Memory[];
-  onStepChange: (step: number) => void;
+  onStepChange: React.Dispatch<React.SetStateAction<number>>;
   onComplete: () => void;
 }) {
   const map = useMap();

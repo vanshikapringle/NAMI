@@ -134,7 +134,7 @@ export default function AnalyticsView({ memories }: { memories: Memory[] }) {
       }
     });
 
-    const avgTripDuration = totalTrips > 0 ? (sumTripDuration / totalTrips).toFixed(1) : 0;
+    const avgTripDuration = totalTrips > 0 ? (sumTripDuration / totalTrips).toFixed(1) : "0";
 
     // Places / Cities / Countries Extraction
     const locationTripsMap = new Map<string, Set<string>>(); // location -> set of trip_ids

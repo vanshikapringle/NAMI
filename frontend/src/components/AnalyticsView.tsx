@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { BarChart3 } from "lucide-react";
 import {
   Cell,
@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
+import NamiWrapped from "./NamiWrapped";
 
 type Memory = {
   id: string;
@@ -90,6 +91,13 @@ function ChartWrapper({
 }
 
 export default function AnalyticsView({ memories }: { memories: Memory[] }) {
+  const [showWrapped, setShowWrapped] = useState(false);
+
+  useEffect(() => {
+    const handleOpen = () => setShowWrapped(true);
+    window.addEventListener('open-nami-wrapped', handleOpen);
+    return () => window.removeEventListener('open-nami-wrapped', handleOpen);
+  }, []);
   const analytics = useMemo(() => {
     const sorted = [...memories].sort(
       (a, b) =>
@@ -186,6 +194,62 @@ export default function AnalyticsView({ memories }: { memories: Memory[] }) {
       return { dateStr, count };
     });
 
+    // --- Dynamic Insights Heuristics ---
+    const insights: string[] = [];
+    
+    // 1. Season travel
+    const seasonCounts: Record<string, number> = { "Winter": 0, "Spring": 0, "Summer": 0, "Autumn": 0 };
+    sorted.forEach((m) => {
+      const month = new Date(m.visit_date).getMonth();
+      if (month === 11 || month <= 1) seasonCounts["Winter"]++;
+      else if (month >= 2 && month <= 4) seasonCounts["Spring"]++;
+      else if (month >= 5 && month <= 7) seasonCounts["Summer"]++;
+      else if (month >= 8 && month <= 10) seasonCounts["Autumn"]++;
+    });
+    const topSeason = Object.entries(seasonCounts).reduce((a, b) => a[1] > b[1] ? a : b);
+    if (topSeason[1] > 0) {
+      insights.push(`You travel most during ${topSeason[0]}.`);
+    }
+
+    // 2. Top Category
+    const topCategory = Object.entries(categoryCounts).length
+      ? Object.entries(categoryCounts).reduce((a, b) => a[1] > b[1] ? a : b)
+      : null;
+    if (topCategory && topCategory[1] > 0) {
+      insights.push(`${topCategory[0]} is your most visited destination type.`);
+    }
+
+    // 3. Revisit Stats
+    const topRevisit = Array.from(locationTripsMap.entries()).reduce((a, b) => a[1].size > b[1].size ? a : b, ["", new Set()]);
+    if (topRevisit[1].size > 1) {
+      insights.push(`You revisited ${topRevisit[0]} ${topRevisit[1].size} times.`);
+    }
+
+    // 4. Avg Trip Days
+    if (totalTrips > 0 && parseFloat(avgTripDuration) > 0) {
+      insights.push(`Your average trip lasts ${avgTripDuration} days.`);
+    }
+
+    // 5. New cities comparison (this year vs last year)
+    const currentYear = now.getFullYear();
+    const citiesThisYear = new Set<string>();
+    const citiesLastYear = new Set<string>();
+    sorted.forEach(m => {
+      const y = new Date(m.visit_date).getFullYear();
+      if (y === currentYear) {
+        const parts = m.location_name?.split(",").map(p => p.trim()) || [];
+        if (parts.length > 1) citiesThisYear.add(parts[parts.length - 2]);
+      } else if (y === currentYear - 1) {
+        const parts = m.location_name?.split(",").map(p => p.trim()) || [];
+        if (parts.length > 1) citiesLastYear.add(parts[parts.length - 2]);
+      }
+    });
+    if (citiesThisYear.size > citiesLastYear.size) {
+      insights.push(`This year you explored more new cities (${citiesThisYear.size}) than last year (${citiesLastYear.size}).`);
+    } else if (citiesLastYear.size > 0) {
+      insights.push(`Last year you explored ${citiesLastYear.size} cities, compared to ${citiesThisYear.size} this year.`);
+    }
+
     return {
       totalMemories,
       totalTrips,
@@ -198,6 +262,7 @@ export default function AnalyticsView({ memories }: { memories: Memory[] }) {
       repeatDestinations,
       categoryData,
       daysGrid,
+      insights,
     };
   }, [memories]);
 
@@ -359,6 +424,56 @@ export default function AnalyticsView({ memories }: { memories: Memory[] }) {
           </ResponsiveContainer>
         </ChartWrapper>
       </div>
+
+      {/* DYNAMIC TEXT INSIGHTS & NAMI WRAPPED */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 border-2 border-[#291217] bg-[#E2D9F3] p-5 sm:p-6 shadow-[4px_4px_0px_0px_rgba(41,18,23,1)]">
+          <div className="flex items-center justify-between border-b border-[#291217]/30 pb-3 mb-4">
+            <h3 className="text-base sm:text-xl font-black uppercase tracking-[0.2em]">
+              TRAVEL INSIGHTS
+            </h3>
+            <span className="border border-[#291217] px-2 py-0.5 text-[10px] font-bold uppercase bg-[#F9A4A6]">
+              AI ASSISTED
+            </span>
+          </div>
+          <div className="space-y-3">
+            {analytics.insights.length > 0 ? (
+              analytics.insights.map((insight, idx) => (
+                <div key={idx} className="flex gap-3 items-start text-sm sm:text-base font-bold bg-white/50 p-3 border border-[#291217]/20">
+                  <span className="text-[#F9A4A6] text-lg leading-none mt-0.5">✺</span>
+                  <span>{insight}</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-sm font-bold opacity-60">Not enough data to generate insights yet. Keep exploring!</div>
+            )}
+          </div>
+        </div>
+
+        <div className="border-2 border-[#291217] bg-[#291217] text-[#E2D9F3] p-5 sm:p-6 shadow-[4px_4px_0px_0px_rgba(251,202,209,1)] flex flex-col items-center justify-center text-center">
+          <div className="mb-4 text-4xl">✨</div>
+          <h3 className="text-xl font-black uppercase tracking-widest mb-2 text-[#F9A4A6]">
+            NAMI WRAPPED
+          </h3>
+          <p className="text-xs font-medium opacity-80 mb-6 px-4">
+            Relive your year in travel. Generate a personalized story of your journeys.
+          </p>
+          <button 
+            onClick={() => window.dispatchEvent(new CustomEvent('open-nami-wrapped'))}
+            className="w-full py-3 border-2 border-[#F9A4A6] bg-transparent text-[#F9A4A6] font-bold uppercase tracking-widest hover:bg-[#F9A4A6] hover:text-[#291217] transition-colors"
+          >
+            Generate Now
+          </button>
+        </div>
+      </div>
+
+      {showWrapped && (
+        <NamiWrapped 
+          memories={memories} 
+          analytics={analytics} 
+          onClose={() => setShowWrapped(false)} 
+        />
+      )}
     </div>
   );
 }

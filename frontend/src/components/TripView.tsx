@@ -4,6 +4,7 @@ import { Route, MapPin, Calendar, Plus } from "lucide-react";
 import Image from "next/image";
 
 import { supabase } from "@/lib/supabaseClient";
+import JourneyReplay from "./JourneyReplay";
 
 type Trip = {
   id: string;
@@ -33,6 +34,7 @@ export default function TripView({
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<Trip>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isReplaying, setIsReplaying] = useState(false);
 
   const activeTrip = useMemo(
     () => trips.find((t) => t.id === selectedTrip) || null,
@@ -285,9 +287,27 @@ export default function TripView({
                 Edit Trip
               </button>
             </div>
+            {tripMemories.length > 0 && (
+              <div className="mt-6 flex justify-start">
+                <button
+                  onClick={() => setIsReplaying(true)}
+                  className="rounded-xl bg-[#F9A4A6] text-[#291217] px-6 py-3 text-sm font-bold uppercase tracking-widest hover:bg-[#F9A4A6]/80 transition-colors shadow-sm"
+                >
+                  ▶ Replay Journey
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
+
+      {isReplaying && activeTrip && (
+        <JourneyReplay 
+          trip={activeTrip} 
+          memories={tripMemories} 
+          onClose={() => setIsReplaying(false)} 
+        />
+      )}
 
       <div className="space-y-12">
         {places.map(([placeName, localMemories]) => (

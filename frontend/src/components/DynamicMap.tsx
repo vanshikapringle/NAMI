@@ -9,7 +9,7 @@ import {
 } from "react-leaflet";
 import "leaflet-defaulticon-compatibility";
 import L from "leaflet";
-import { Layers } from "lucide-react";
+import { Layers, Play } from "lucide-react";
 
 type Trip = {
   id: string;
@@ -77,6 +77,50 @@ function MapController({
   return null;
 }
 
+function MapReplayController({
+  memories,
+  onStepChange,
+  onComplete,
+}: {
+  memories: Memory[];
+  onStepChange: (step: number) => void;
+  onComplete: () => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (memories.length === 0) return;
+    
+    // Fly to first memory
+    const firstMem = memories[0];
+    if (firstMem.lat && firstMem.lng) {
+      map.flyTo([firstMem.lat, firstMem.lng], 9, { duration: 1.5 });
+    }
+    onStepChange(0);
+
+    const interval = setInterval(() => {
+      onStepChange((prevStep) => {
+        const next = prevStep + 1;
+        if (next >= memories.length) {
+          clearInterval(interval);
+          setTimeout(onComplete, 3000);
+          return prevStep;
+        }
+        
+        const mem = memories[next];
+        if (mem.lat && mem.lng) {
+          map.flyTo([mem.lat, mem.lng], 9, { duration: 1.5 });
+        }
+        return next;
+      });
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [memories, map, onStepChange, onComplete]);
+
+  return null;
+}
+
 export default function DynamicMap({
   memories,
   trips = [],
@@ -93,6 +137,17 @@ export default function DynamicMap({
     set.add("unassigned");
     return set;
   });
+  
+  const [replayingTripId, setReplayingTripId] = useState<string | null>(null);
+  const [replayStep, setReplayStep] = useState<number>(0);
+  
+  const replayingTrip = useMemo(() => trips.find(t => t.id === replayingTripId), [replayingTripId, trips]);
+  const replayingMemories = useMemo(() => {
+    if (!replayingTripId) return [];
+    return memories
+      .filter(m => m.trip_id === replayingTripId)
+      .sort((a, b) => new Date(a.visit_date).getTime() - new Date(b.visit_date).getTime());
+  }, [replayingTripId, memories]);
 
   // Ensure new trips are automatically checked when loaded
   useEffect(() => {
@@ -205,16 +260,27 @@ export default function DynamicMap({
             <h4 className="mb-2 text-xs font-black uppercase tracking-wider text-muted-foreground">Visible Trips</h4>
             <div className="space-y-1">
               {trips.map(trip => (
-                <label key={trip.id} className="flex cursor-pointer items-center gap-2 rounded-lg p-2 hover:bg-secondary/50">
-                  <input
-                    type="checkbox"
-                    checked={activeTripIds.has(trip.id)}
-                    onChange={() => toggleTrip(trip.id)}
-                    className="accent-primary"
-                  />
-                  <div className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: generateColor(trip.id) }} />
-                  <span className="truncate text-sm font-semibold">{trip.name}</span>
-                </label>
+                <div key={trip.id} className="flex items-center justify-between gap-1 rounded-lg p-1.5 hover:bg-secondary/50">
+                  <label className="flex cursor-pointer items-center gap-2 flex-1">
+                    <input
+                      type="checkbox"
+                      checked={activeTripIds.has(trip.id)}
+                      onChange={() => toggleTrip(trip.id)}
+                      className="accent-primary"
+                    />
+                    <div className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: generateColor(trip.id) }} />
+                    <span className="truncate text-sm font-semibold">{trip.name}</span>
+                  </label>
+                  {activeTripIds.has(trip.id) && (
+                    <button 
+                      onClick={() => setReplayingTripId(trip.id)}
+                      className="p-1 hover:bg-[#F9A4A6] rounded text-[#291217] transition-colors"
+                      title="Replay Journey"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                    </button>
+                  )}
+                </div>
               ))}
               <label className="flex cursor-pointer items-center gap-2 rounded-lg p-2 hover:bg-secondary/50">
                 <input
@@ -250,18 +316,12 @@ export default function DynamicMap({
             positions={segment.positions}
             pathOptions={{
               color: segment.color,
-              weight: 4,
-              dashArray: "10, 10",
-              opacity: 1
+              weight: 2,
+              dashArray: "5, 5",
+              opacity: 0.8
             }}
           />
         ))}
-
-        {/* Debug Polyline */}
-        <Polyline
-          positions={[[31.1048, 77.1734], [30.9048, 76.1734], [31.5, 78.5]]}
-          pathOptions={{ color: 'blue', weight: 8 }}
-        />
 
         {coordinateGroups.map(([coordKey, { memories: entries, color }]) => {
           const firstMemory = entries[0];
@@ -333,7 +393,62 @@ export default function DynamicMap({
             </Marker>
           );
         })}
+        {replayingTripId && replayingMemories.length > 0 && (
+          <MapReplayController
+            memories={replayingMemories}
+            onStepChange={setReplayStep}
+            onComplete={() => setReplayingTripId(null)}
+          />
+        )}
+        
+        {/* Playback Path with different colors */}
+        {replayingTripId && replayingMemories.slice(0, replayStep + 1).map((mem, idx, arr) => {
+          if (idx === 0) return null;
+          const prev = arr[idx - 1];
+          if (!prev.lat || !prev.lng || !mem.lat || !mem.lng) return null;
+          // Use different colors for each segment during replay
+          const color = generateColor(mem.id); 
+          return (
+            <Polyline
+              key={`replay-seg-${idx}`}
+              positions={[[Number(prev.lat), Number(prev.lng)], [Number(mem.lat), Number(mem.lng)]]}
+              pathOptions={{
+                color: color,
+                weight: 4,
+                dashArray: "10, 10",
+                className: "animate-pulse" // make it pulse for effect
+              }}
+            />
+          );
+        })}
       </MapContainer>
+
+      {/* Floating Card for Replay */}
+      {replayingTripId && replayingMemories[replayStep] && (
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[1000] w-[90%] max-w-sm bg-[#291217] text-[#E2D9F3] border-4 border-[#F9A4A6] p-4 shadow-2xl flex flex-col gap-3 rounded-xl animate-in fade-in slide-in-from-bottom-4">
+          <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest text-[#F9A4A6]">
+            <span>{replayingTrip?.name}</span>
+            <span>{replayStep + 1} / {replayingMemories.length}</span>
+          </div>
+          {replayingMemories[replayStep].image_url && (
+            <img 
+              src={replayingMemories[replayStep].image_url!} 
+              alt="memory" 
+              className="w-full h-32 object-cover rounded border border-white/20"
+            />
+          )}
+          <div>
+            <h3 className="font-black text-lg">{replayingMemories[replayStep].title}</h3>
+            <p className="text-sm opacity-80">{replayingMemories[replayStep].location_name}</p>
+          </div>
+          <button 
+            onClick={() => setReplayingTripId(null)}
+            className="absolute -top-4 -right-4 bg-[#F9A4A6] text-[#291217] w-8 h-8 rounded-full flex items-center justify-center font-black hover:scale-110 transition-transform"
+          >
+            X
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -226,7 +226,7 @@ export default function AnalyticsView({ memories }: { memories: Memory[] }) {
     }
 
     // 4. Avg Trip Days
-    if (totalTrips > 0 && parseFloat(avgTripDuration) > 0) {
+    if (totalTrips > 0 && Number(avgTripDuration) > 0) {
       insights.push(`Your average trip lasts ${avgTripDuration} days.`);
     }
 

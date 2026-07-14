@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 import { X, Trophy, MapPin, Map, Plane, Compass } from "lucide-react";
 import Image from "next/image";
 
@@ -58,7 +58,7 @@ export default function NamiWrapped({
   // 4: The Discoveries (Insights)
   // 5: Summary Poster
 
-  const slideVariants = {
+  const slideVariants: Variants = {
     initial: { opacity: 0, scale: 0.9, y: 50 },
     animate: { opacity: 1, scale: 1, y: 0, transition: { type: "spring", stiffness: 200, damping: 20 } },
     exit: { opacity: 0, scale: 1.1, y: -50, transition: { duration: 0.3 } }

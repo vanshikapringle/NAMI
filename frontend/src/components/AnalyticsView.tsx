@@ -263,6 +263,7 @@ export default function AnalyticsView({ memories }: { memories: Memory[] }) {
       categoryData,
       daysGrid,
       insights,
+      locationData: Object.entries(locationCounts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
     };
   }, [memories]);
 
@@ -316,6 +317,44 @@ export default function AnalyticsView({ memories }: { memories: Memory[] }) {
           <div className="h-3 w-3 bg-[#F9A4A6] border border-[#291217]" />
           <div className="h-3 w-3 bg-[#291217] border border-[#291217]" />
           <span>More</span>
+        </div>
+      </div>
+
+      {/* LOCATION FREQUENCY HEATMAP */}
+      <div className="border-2 border-[#291217] bg-[#E2D9F3] p-5 sm:p-6 shadow-[4px_4px_0px_0px_rgba(41,18,23,1)]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#291217]/30 pb-3 mb-4">
+          <h3 className="text-base sm:text-xl font-black uppercase tracking-[0.2em]">
+            LOCATION FREQUENCY HEATMAP
+          </h3>
+          <span className="text-[10px] sm:text-xs font-bold uppercase opacity-75">
+            ALL TIME
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-2 py-2 justify-center sm:justify-start">
+          {analytics.locationData.length > 0 ? (
+            analytics.locationData.map((loc, idx) => {
+              const maxCount = Math.max(...analytics.locationData.map(d => d.count));
+              const intensity = maxCount > 0 ? loc.count / maxCount : 0;
+              
+              let bgClass = "bg-white/60 text-[#291217]";
+              if (intensity > 0.25) bgClass = "bg-[#FBCAD1] text-[#291217]";
+              if (intensity > 0.5) bgClass = "bg-[#F9A4A6] text-[#291217]";
+              if (intensity > 0.75) bgClass = "bg-[#291217] text-[#E2D9F3]";
+
+              return (
+                <div
+                  key={idx}
+                  title={`${loc.name}: ${loc.count} visits`}
+                  className={`px-3 py-2 border-2 border-[#291217] text-xs sm:text-sm font-bold uppercase cursor-pointer hover:scale-105 transition-transform ${bgClass}`}
+                >
+                  {loc.name} <span className="opacity-60 ml-1">({loc.count})</span>
+                </div>
+              );
+            })
+          ) : (
+             <div className="text-sm font-bold opacity-60">No location data available.</div>
+          )}
         </div>
       </div>
 
